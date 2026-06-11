@@ -32,6 +32,32 @@ namespace ClawMachine
         [SerializeField] private Vector2 xLimits = new Vector2(-0.22f, 0.22f);
         [SerializeField] private Vector2 zLimits = new Vector2(-0.22f, 0.22f);
 
+        [Header("13-2 Sensor bracket (จำกัดพื้นที่เลื่อนตามขนาดขา)")]
+        [Tooltip("ถ้า assign settings ขอบเขตจะคำนวณจากความยาวขา+มุมกาง (ขา L = พื้นที่แคบลง)")]
+        [SerializeField] private MachineSettings machineSettings;
+        [Tooltip("ครึ่งความกว้างพื้นที่เล่นในตู้ (ถึงผนังกระจก)")]
+        [SerializeField] private float cabinetHalfExtent = 0.30f;
+        [Tooltip("ระยะกันปลายขาเฉี่ยวกระจก")]
+        [SerializeField] private float wallClearance = 0.01f;
+
+        /// <summary>ขอบเขตเลื่อนปัจจุบัน (สำหรับแสดงบนแผงปรับ)</summary>
+        public float CurrentTravelLimit => xLimits.y;
+
+        /// <summary>
+        /// 13-2: คำนวณขอบเขตเลื่อนใหม่จากขนาดขา — ปลายขาตอนกางต้องไม่ถึงกระจก
+        /// (เหมือนร้านเลื่อน sensor bracket ตามผัง FIG 13-2a เมื่อเปลี่ยนขา S/M/L)
+        /// </summary>
+        public void ApplyFromSettings()
+        {
+            if (machineSettings == null) return;
+            // รัศมีปลายขาตอนกาง = sin(มุมกาง) × ความยาวขา (ขา M = 0.165m)
+            float tipReach = Mathf.Sin(machineSettings.openArmAngle * Mathf.Deg2Rad)
+                             * 0.165f * machineSettings.ArmSizeScale;
+            float limit = Mathf.Max(0.05f, cabinetHalfExtent - tipReach - wallClearance);
+            xLimits = new Vector2(-limit, limit);
+            zLimits = new Vector2(-limit, limit);
+        }
+
         [Header("ตำแหน่งแกน Y (local ของ clawHead)")]
         [Tooltip("ระดับบนสุด (home) ที่ขาพักและปล่อยของ")]
         [SerializeField] private float yTop = 0f;
@@ -85,6 +111,7 @@ namespace ClawMachine
 
         private void Start()
         {
+            ApplyFromSettings(); // 13-2: ขอบเขตตามขนาดขาที่ติดตั้ง
             EnterAiming();
         }
 

@@ -145,21 +145,31 @@ namespace ClawMachine
 
             // 13-4: เปลี่ยนความกว้างแผ่น shovel (W30/W40/W60) สดๆ
             // หารด้วย armScale เพื่อให้ W30/40/60 เป็นขนาดสัมบูรณ์ ไม่โดนสเกลขาคูณซ้ำ
-            ApplyShovelWidth(leftArm, armScale);
-            ApplyShovelWidth(rightArm, armScale);
+            // มุมปลาย: ตั้งให้แผ่นราบพอดีตอนหุบ + แอ่นรับ (scoop tilt) เพื่อให้ของนั่งบนแผ่นได้
+            ApplyShovel(leftArm, armScale, inwardSign: -1f);
+            ApplyShovel(rightArm, armScale, inwardSign: +1f);
 
             ReapplyPhase();
         }
 
-        private void ApplyShovelWidth(Transform arm, float armScale)
+        [Tooltip("มุมแอ่นรับของแผ่น shovel ตอนหุบ (องศา) — ขอบในเชิดขึ้นเล็กน้อยเหมือนถาด")]
+        [SerializeField] private float shovelScoopTilt = 5f;
+
+        // inwardSign ต้องตรงกับตอนสร้างใน ClawSceneBuilder (ซ้าย=-1 / ขวา=+1)
+        private void ApplyShovel(Transform arm, float armScale, float inwardSign)
         {
             if (arm == null || settings == null) return;
             foreach (Transform child in arm)
             {
                 if (!child.name.Contains("_Shovel")) continue;
+
                 var s = child.localScale;
                 s.z = settings.ShovelWidthMeters / Mathf.Max(0.1f, armScale);
                 child.localScale = s;
+
+                // แผ่นราบ (แนวนอน) พอดีเมื่อขาหุบที่ closedAngle + แอ่นรับขอบในขึ้นอีกนิด
+                child.localRotation = Quaternion.Euler(
+                    0f, 0f, inwardSign * (closedAngle + shovelScoopTilt));
             }
         }
 

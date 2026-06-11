@@ -103,7 +103,20 @@ namespace ClawMachine
                 if (n != s.payoutEveryN) { s.payoutEveryN = n; changed = true; }
             }
 
-            if (changed && grip != null) grip.ApplyFromSettings();
+            if (changed)
+            {
+                if (grip != null) grip.ApplyFromSettings();
+                if (claw != null) claw.ApplyFromSettings(); // 13-2: ขอบเขตเลื่อนตามขนาดขา
+            }
+
+            // ===== 13-2: sensor bracket (อัตโนมัติ) =====
+            if (claw != null)
+            {
+                GUILayout.Space(4);
+                GUILayout.Label(
+                    $"<b>13-2  Sensor bracket</b>  ระยะเลื่อน ±{claw.CurrentTravelLimit:0.00} m " +
+                    "(คำนวณจากขนาดขา+มุมกาง)", Rich());
+            }
 
             // ===== สถานะ =====
             GUILayout.Space(8);

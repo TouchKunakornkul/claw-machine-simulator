@@ -370,9 +370,10 @@ namespace ClawMachine.EditorTools
             tip.name = name + "_Shovel_" + settings.shovel;
             tip.transform.SetParent(pivot, false);
             // เรขาคณิต spec จริง: กาง 50° ช่องเปิด ~17cm / หุบ 15° ปลายเกือบแตะ (ไม่ทับกัน)
+            // มุมปลาย = closedAngle+scoop เพื่อให้แผ่นราบพอดีตอนหุบ (grip จะอัปเดตสดอีกที)
             tip.transform.localScale = new Vector3(0.04f, 0.006f, settings.ShovelWidthMeters);
             tip.transform.localPosition = new Vector3(inwardSign * 0.02f, -0.165f, 0f);
-            tip.transform.localRotation = Quaternion.Euler(0f, 0f, -inwardSign * 25f);
+            tip.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 20f);
             Paint(tip, metal);
             var tcol = tip.GetComponent<BoxCollider>();
             if (mat != null) tcol.sharedMaterial = mat;
@@ -469,6 +470,8 @@ namespace ClawMachine.EditorTools
             so.FindProperty("clawHead").objectReferenceValue = grip.transform; // ClawHead = ที่ติด grip
             so.FindProperty("gripSystem").objectReferenceValue = grip;
             so.FindProperty("payoutManager").objectReferenceValue = payout;
+            so.FindProperty("machineSettings").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<MachineSettings>(SettingsPath); // 13-2 sensor bracket
             so.FindProperty("returnToChute").boolValue = false; // hashi-watashi: ปล่อยตรงจุดที่คีบ
             so.FindProperty("yTop").floatValue = 0f;
             so.FindProperty("yBottom").floatValue = -0.40f;
