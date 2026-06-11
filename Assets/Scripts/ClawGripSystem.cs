@@ -122,6 +122,9 @@ namespace ClawMachine
         {
             if (settings == null) return;
 
+            // ทิศการกางขาเทียบคาน (ตู้จริงส่วนใหญ่ ~45°) — หมุนทั้งหัวคีบรอบแกนตั้ง
+            transform.localRotation = Quaternion.Euler(0f, settings.clawYaw, 0f);
+
             // 13-1: เปลี่ยนขา S/M/L = เปลี่ยนความยาวขาจริง (สเกลรอบ pivot ซึ่งเป็นจุดหมุน)
             float armScale = settings.ArmSizeScale;
             if (leftArm != null) leftArm.localScale = Vector3.one * armScale;

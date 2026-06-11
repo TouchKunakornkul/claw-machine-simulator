@@ -312,6 +312,7 @@ namespace ClawMachine.EditorTools
             s.shovel = MachineSettings.ShovelType.W40;
             s.openArmAngle = 50f; // spec จริง: กาง ~45-50° ช่องเปิดพอคร่อมกล่อง figure
             s.shovelGapCm = 0.5f; // 13-4: ปลายเกือบแตะ ไม่ overlap
+            s.clawYaw = 45f;      // ตู้จริงส่วนใหญ่ขากางทแยง 45° กับคาน
             s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
             Directory.CreateDirectory("Assets/Physics");
             AssetDatabase.CreateAsset(s, SettingsPath);

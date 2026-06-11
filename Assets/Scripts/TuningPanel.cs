@@ -89,6 +89,22 @@ namespace ClawMachine
             float newOpen = GUILayout.HorizontalSlider(s.openArmAngle, 20f, 60f);
             if (!Mathf.Approximately(newOpen, s.openArmAngle)) { s.openArmAngle = newOpen; changed = true; }
 
+            // ===== ทิศการกางขาเทียบคาน (การติดตั้ง — ไม่มีใน manual) =====
+            GUILayout.Space(8);
+            GUILayout.Label($"<b>ทิศการกางขาเทียบคาน</b>  {s.clawYaw:0}°  (ตู้จริงส่วนใหญ่ ~45°)", Rich());
+            int yawPreset = GUILayout.Toolbar(
+                Mathf.Approximately(s.clawYaw, 0f) ? 0 :
+                Mathf.Approximately(s.clawYaw, 45f) ? 1 :
+                Mathf.Approximately(s.clawYaw, 90f) ? 2 : -1,
+                new[] { "ขนานคาน 0°", "ทแยง 45°", "ตั้งฉาก 90°" }, GUILayout.Height(26));
+            if (yawPreset >= 0)
+            {
+                float presetVal = yawPreset == 0 ? 0f : yawPreset == 1 ? 45f : 90f;
+                if (!Mathf.Approximately(presetVal, s.clawYaw)) { s.clawYaw = presetVal; changed = true; }
+            }
+            float newYaw = GUILayout.HorizontalSlider(s.clawYaw, 0f, 90f);
+            if (!Mathf.Approximately(newYaw, s.clawYaw)) { s.clawYaw = newYaw; changed = true; }
+
             // ===== ประเภทตู้ =====
             GUILayout.Space(8);
             GUILayout.Label("<b>ประเภทตู้</b>", Rich());
