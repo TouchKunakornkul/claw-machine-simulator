@@ -123,8 +123,9 @@ namespace ClawMachine
 
         private void TickDropping()
         {
-            // โดนต้าน = มีของเข้ามาในระยะคีบ -> หยุดทันที (ไม่ดันของลงต่อ)
-            if (gripSystem.PrizeInRange())
+            // ดิ่งต่อจนกว่ามี "แรงต้านจริง": ขาโดนของดันจนเบี่ยงเกิน threshold
+            // (เฉียดขอบ = ขาแกว่งนิดเดียวแล้วลื่นผ่าน — ดิ่งต่อ)
+            if (gripSystem.ArmsResisted())
             {
                 EnterGripping();
                 return;
@@ -133,7 +134,7 @@ namespace ClawMachine
             Vector3 p = clawHead.localPosition;
             p.y -= descentSpeed * Time.deltaTime;
 
-            // กันเผื่อด้วย raycast (กรณีของบางเฉียดขอบ sphere) + ชนพื้น
+            // ของอยู่ใต้กึ่งกลางหัวพอดี (ขาคร่อมไม่โดน) ก็ถือว่าถึงของ + กันทะลุพื้น
             bool hitBottom = p.y <= yBottom;
             Vector3 probeOrigin = dropProbe != null ? dropProbe.position : clawHead.position;
             bool hitObject = Physics.Raycast(

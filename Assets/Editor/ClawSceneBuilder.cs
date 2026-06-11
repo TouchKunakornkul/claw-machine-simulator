@@ -278,7 +278,7 @@ namespace ClawMachine.EditorTools
             // ขาดิ่ง: ยิง ray จาก GrabPoint หา prize เท่านั้น (กัน ray ชนขาตัวเอง)
             var cso = new SerializedObject(claw);
             cso.FindProperty("dropProbe").objectReferenceValue = grabPoint;
-            cso.FindProperty("groundCheckDistance").floatValue = 0.025f;
+            cso.FindProperty("groundCheckDistance").floatValue = 0.012f; // เกือบแตะจริงเท่านั้น
             cso.FindProperty("dropBlockingLayers").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             cso.ApplyModifiedPropertiesWithoutUndo();
 
@@ -288,8 +288,8 @@ namespace ClawMachine.EditorTools
             so.FindProperty("leftArm").objectReferenceValue = leftArm;
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
-            so.FindProperty("contactRadius").floatValue = 0.02f;  // หยุดดิ่งเมื่อแตะจริง
-            so.FindProperty("latchRadius").floatValue = 0.05f;    // คว้าเมื่อของอยู่ในง่าม
+            so.FindProperty("latchRadius").floatValue = 0.05f;       // คว้าเมื่อของอยู่ในง่าม
+            so.FindProperty("resistanceAngle").floatValue = 12f;     // ขาเบี่ยงเกินนี้ = โดนต้าน
             so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             so.ApplyModifiedPropertiesWithoutUndo();
 

@@ -57,8 +57,6 @@ namespace ClawMachine
         [Header("Grab detection")]
         [Tooltip("จุดกึ่งกลางระหว่างปลายขา ใช้หา prize ที่จะยึด")]
         [SerializeField] private Transform grabPoint;
-        [Tooltip("ระยะ 'สัมผัสจริง' สำหรับหยุดการดิ่ง — ต้องเล็ก (ปลายขาแตะของจริงๆ)")]
-        [SerializeField] private float contactRadius = 0.02f;
         [Tooltip("ระยะคว้าหลังขาหุบเสร็จ — ของต้องอยู่ในง่ามจริงถึงจะเกาะ")]
         [SerializeField] private float latchRadius = 0.045f;
         [SerializeField] private LayerMask prizeLayer = ~0;
@@ -111,12 +109,24 @@ namespace ClawMachine
                 heldPrize = null;
         }
 
-        /// <summary>ปลายขา "แตะ" ของจริงหรือยัง (ระยะสั้นมาก) — ใช้หยุดการดิ่ง</summary>
-        public bool PrizeInRange()
+        [Header("ตรวจแรงต้าน (ใช้หยุดการดิ่ง)")]
+        [Tooltip("ขาโดนดันจนมุมเบี่ยงจากมุมพักเกินนี้ = มีแรงต้านจริง (องศา)")]
+        [SerializeField] private float resistanceAngle = 12f;
+
+        /// <summary>
+        /// มีแรงต้านจริงส่งขึ้นมาที่ขาหรือยัง — ขาโดนของดันจนมุม hinge เบี่ยงจากเป้า spring
+        /// เกิน resistanceAngle (เฉียดขอบ = เบี่ยงนิดเดียว ดิ่งต่อ/ลื่นผ่านได้)
+        /// </summary>
+        public bool ArmsResisted()
         {
-            if (grabPoint == null) return false;
-            return Physics.CheckSphere(
-                grabPoint.position, contactRadius, prizeLayer, QueryTriggerInteraction.Ignore);
+            return HingeDeviation(leftHinge) > resistanceAngle
+                || HingeDeviation(rightHinge) > resistanceAngle;
+        }
+
+        private static float HingeDeviation(HingeJoint h)
+        {
+            if (h == null) return 0f;
+            return Mathf.Abs(h.angle - h.spring.targetPosition);
         }
 
         // ---------- API ที่ ClawController เรียก ----------
@@ -234,8 +244,6 @@ namespace ClawMachine
         {
             if (grabPoint != null)
             {
-                Gizmos.color = Color.red;
-                Gizmos.DrawWireSphere(grabPoint.position, contactRadius);
                 Gizmos.color = Color.yellow;
                 Gizmos.DrawWireSphere(grabPoint.position, latchRadius);
             }
