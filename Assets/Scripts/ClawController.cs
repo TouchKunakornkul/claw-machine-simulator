@@ -56,8 +56,11 @@ namespace ClawMachine
         [SerializeField] private KeyCode dropKey = KeyCode.Space;
 
         [Header("Collision ตอนดิ่ง")]
-        [Tooltip("ระยะ raycast ตรวจว่าขาชนของ/พื้นแล้วหรือยัง")]
-        [SerializeField] private float groundCheckDistance = 0.02f;
+        [Tooltip("จุดยิง ray ตรวจการชน — ควรตั้งเป็น GrabPoint (ปลายขา) ถ้าเว้นว่างใช้ clawHead")]
+        [SerializeField] private Transform dropProbe;
+        [Tooltip("ระยะ raycast ตรวจว่าปลายขาชนของแล้วหรือยัง")]
+        [SerializeField] private float groundCheckDistance = 0.03f;
+        [Tooltip("เลเยอร์ที่หยุดการดิ่ง (ตั้งเป็น Prize เท่านั้น เพื่อไม่ให้ ray ชนขาตัวเอง)")]
         [SerializeField] private LayerMask dropBlockingLayers = ~0;
 
         public ClawState State { get; private set; } = ClawState.Idle;
@@ -122,8 +125,9 @@ namespace ClawMachine
             p.y -= descentSpeed * Time.deltaTime;
 
             bool hitBottom = p.y <= yBottom;
+            Vector3 probeOrigin = dropProbe != null ? dropProbe.position : clawHead.position;
             bool hitObject = Physics.Raycast(
-                clawHead.position, Vector3.down,
+                probeOrigin, Vector3.down,
                 groundCheckDistance, dropBlockingLayers, QueryTriggerInteraction.Ignore);
 
             if (hitBottom || hitObject)

@@ -1,0 +1,347 @@
+#if UNITY_EDITOR
+using System.IO;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace ClawMachine.EditorTools
+{
+    /// <summary>
+    /// สร้าง MVP scene ตู้คีบ 2 ขาทั้งหมดด้วยโค้ด แล้ว wire component ให้ถูกต้องผ่าน Unity API
+    /// เมนู: Claw Machine > Build MVP Scene
+    ///
+    /// ใช้ primitive (cube) แทนโมเดลจริงเพื่อให้กด Play เล่นได้ทันที — เปลี่ยนเป็นโมเดลสวยทีหลังได้
+    /// </summary>
+    public static class ClawSceneBuilder
+    {
+        private const string ScenePath = "Assets/Scenes/Main.unity";
+        private const string PhysMatPath = "Assets/Physics/LowFriction.physicMaterial";
+        private const string PrizeLayerName = "Prize";
+
+        [MenuItem("Claw Machine/Build MVP Scene")]
+        public static void BuildScene()
+        {
+            EnsurePrizeLayer();
+            ApplyPhysicsProjectSettings();
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var lowFriction = CreateLowFrictionMaterial();
+            int prizeLayer = LayerMask.NameToLayer(PrizeLayerName);
+
+            BuildLighting();
+            BuildCabinet(lowFriction);
+            var chute = BuildChute();
+            var (claw, grip) = BuildClaw(lowFriction);
+            var payout = BuildSystems();
+            var (frontCam, sideCam) = BuildCameras();
+            SpawnPrizes(lowFriction, prizeLayer);
+
+            WireClawController(claw, grip, payout);
+            WireSystems(claw, grip, payout, chute, frontCam, sideCam);
+
+            // save
+            Directory.CreateDirectory("Assets/Scenes");
+            EditorSceneManager.SaveScene(scene, ScenePath);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            Debug.Log("[ClawSceneBuilder] สร้าง scene เสร็จ: " + ScenePath +
+                      " — กด Play ได้เลย (Arrows เลื่อน, Space ดิ่ง, C สลับกล้อง, P บังคับ payout)");
+            EditorUtility.DisplayDialog("Claw Machine",
+                "สร้าง MVP scene เสร็จแล้ว!\n\nกด Play เพื่อทดสอบ\nArrows = เลื่อน, Space = ดิ่ง\nC = สลับกล้อง, P = บังคับ payout",
+                "OK");
+        }
+
+        // ---------- Project settings ----------
+
+        private static void EnsurePrizeLayer()
+        {
+            var tagManager = new SerializedObject(
+                AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
+            var layers = tagManager.FindProperty("layers");
+
+            // ถ้ามีอยู่แล้วข้าม
+            for (int i = 0; i < layers.arraySize; i++)
+                if (layers.GetArrayElementAtIndex(i).stringValue == PrizeLayerName) return;
+
+            // ใส่ที่ user layer ว่างตัวแรก (>= 8)
+            for (int i = 8; i < layers.arraySize; i++)
+            {
+                var el = layers.GetArrayElementAtIndex(i);
+                if (string.IsNullOrEmpty(el.stringValue))
+                {
+                    el.stringValue = PrizeLayerName;
+                    tagManager.ApplyModifiedProperties();
+                    return;
+                }
+            }
+            Debug.LogWarning("[ClawSceneBuilder] ไม่มี user layer ว่างสำหรับ 'Prize'");
+        }
+
+        private static void ApplyPhysicsProjectSettings()
+        {
+            // ชนแม่นยำ ขาไม่ทะลุของ (ดู PRD หัวข้อ 4)
+            Time.fixedDeltaTime = 0.01f;
+            Physics.defaultSolverIterations = 12;
+            Physics.defaultSolverVelocityIterations = 4;
+        }
+
+        private static PhysicsMaterial CreateLowFrictionMaterial()
+        {
+            var mat = new PhysicsMaterial("LowFriction")
+            {
+                dynamicFriction = 0.15f,
+                staticFriction = 0.20f,
+                bounciness = 0f,
+                frictionCombine = PhysicsMaterialCombine.Minimum,
+                bounceCombine = PhysicsMaterialCombine.Minimum
+            };
+            Directory.CreateDirectory("Assets/Physics");
+            AssetDatabase.CreateAsset(mat, PhysMatPath);
+            return mat;
+        }
+
+        // ---------- Scene pieces ----------
+
+        private static void BuildLighting()
+        {
+            var go = new GameObject("Directional Light");
+            var light = go.AddComponent<Light>();
+            light.type = LightType.Directional;
+            light.intensity = 1.1f;
+            light.shadows = LightShadows.Soft;
+            go.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+        }
+
+        private static void BuildCabinet(PhysicsMaterial mat)
+        {
+            var root = new GameObject("Cabinet").transform;
+
+            // พื้นตู้ (ผิวบนที่ y=0)
+            var floor = MakeBox("Floor", new Vector3(0f, -0.025f, 0f),
+                new Vector3(0.6f, 0.05f, 0.6f), root, mat, new Color(0.2f, 0.2f, 0.22f));
+
+            // ผนัง 4 ด้าน สูง 0.3 หนา 0.02 (เตี้ยพอให้กล้องมองเข้า)
+            const float h = 0.3f, t = 0.02f, half = 0.3f;
+            MakeBox("Wall_Back", new Vector3(0f, h / 2f, half), new Vector3(0.6f, h, t), root, mat, WallColor());
+            MakeBox("Wall_Front", new Vector3(0f, h / 2f, -half), new Vector3(0.6f, h, t), root, mat, WallColor());
+            MakeBox("Wall_Left", new Vector3(-half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, WallColor());
+            MakeBox("Wall_Right", new Vector3(half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, WallColor());
+        }
+
+        private static Color WallColor() => new Color(0.15f, 0.35f, 0.55f, 1f);
+
+        private static PrizeCatchZone BuildChute()
+        {
+            // ท่อรับของมุมหลัง-ขวา
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "Chute";
+            Object.DestroyImmediate(go.GetComponent<MeshRenderer>()); // มองไม่เห็น
+            go.transform.position = new Vector3(0.18f, 0.08f, 0.18f);
+            go.transform.localScale = new Vector3(0.12f, 0.16f, 0.12f);
+            var col = go.GetComponent<BoxCollider>();
+            col.isTrigger = true;
+            return go.AddComponent<PrizeCatchZone>();
+        }
+
+        private static (ClawController, ClawGripSystem) BuildClaw(PhysicsMaterial mat)
+        {
+            var machine = new GameObject("ClawMachine").transform;
+
+            var gantry = new GameObject("Gantry").transform;
+            gantry.SetParent(machine, false);
+            gantry.localPosition = new Vector3(0f, 0.55f, 0f);
+            var claw = gantry.gameObject.AddComponent<ClawController>();
+
+            var clawHead = new GameObject("ClawHead").transform;
+            clawHead.SetParent(gantry, false);
+            clawHead.localPosition = Vector3.zero;
+
+            // ลำตัวหัวคีบ (visual)
+            var body = MakeBox("HeadBody", Vector3.zero, new Vector3(0.07f, 0.05f, 0.07f),
+                clawHead, null, new Color(0.85f, 0.7f, 0.2f));
+            Object.DestroyImmediate(body.GetComponent<BoxCollider>());
+
+            var grip = clawHead.gameObject.AddComponent<ClawGripSystem>();
+
+            // ขา 2 ข้าง — pivot ที่ด้านบน (local y=-0.04 ใต้หัว) mesh ยื่นลง
+            var leftArm = BuildArm("LeftArm", clawHead, mat);
+            var rightArm = BuildArm("RightArm", clawHead, mat);
+
+            // GrabPoint กึ่งกลางปลายขา
+            var grabPoint = new GameObject("GrabPoint").transform;
+            grabPoint.SetParent(clawHead, false);
+            grabPoint.localPosition = new Vector3(0f, -0.16f, 0f);
+
+            // ขาดิ่ง: ยิง ray จาก GrabPoint หา prize เท่านั้น (กัน ray ชนขาตัวเอง)
+            var cso = new SerializedObject(claw);
+            cso.FindProperty("dropProbe").objectReferenceValue = grabPoint;
+            cso.FindProperty("groundCheckDistance").floatValue = 0.04f;
+            cso.FindProperty("dropBlockingLayers").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
+            cso.ApplyModifiedPropertiesWithoutUndo();
+
+            // wire grip ผ่าน SerializedObject (field เป็น private [SerializeField])
+            var so = new SerializedObject(grip);
+            so.FindProperty("leftArm").objectReferenceValue = leftArm;
+            so.FindProperty("rightArm").objectReferenceValue = rightArm;
+            so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
+            so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            return (claw, grip);
+        }
+
+        private static Transform BuildArm(string name, Transform parent, PhysicsMaterial mat)
+        {
+            // pivot empty
+            var pivot = new GameObject(name).transform;
+            pivot.SetParent(parent, false);
+            pivot.localPosition = new Vector3(0f, -0.04f, 0f);
+
+            // mesh ขา: cube ยาวยื่นลง ปลายบนชิด pivot
+            var arm = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            arm.name = name + "_Mesh";
+            arm.transform.SetParent(pivot, false);
+            arm.transform.localScale = new Vector3(0.02f, 0.12f, 0.02f);
+            arm.transform.localPosition = new Vector3(0f, -0.06f, 0f);
+            Paint(arm, new Color(0.75f, 0.75f, 0.8f));
+            var col = arm.GetComponent<BoxCollider>();
+            if (mat != null) col.sharedMaterial = mat;
+
+            return pivot;
+        }
+
+        private static PayoutManager BuildSystems()
+        {
+            var systems = new GameObject("Systems");
+            return systems.AddComponent<PayoutManager>();
+        }
+
+        private static (Camera front, Camera side) BuildCameras()
+        {
+            var front = MakeCamera("FrontCamera", new Vector3(0f, 0.55f, -0.95f), true);
+            front.gameObject.AddComponent<AudioListener>();
+
+            var side = MakeCamera("SideCamera", new Vector3(0.95f, 0.55f, 0f), false);
+            return (front, side);
+        }
+
+        private static Camera MakeCamera(string name, Vector3 pos, bool enabled)
+        {
+            var go = new GameObject(name);
+            go.transform.position = pos;
+            go.transform.LookAt(new Vector3(0f, 0.1f, 0f));
+            var cam = go.AddComponent<Camera>();
+            cam.enabled = enabled;
+            cam.backgroundColor = new Color(0.05f, 0.05f, 0.08f);
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.fieldOfView = 45f;
+            return cam;
+        }
+
+        private static void SpawnPrizes(PhysicsMaterial mat, int layer)
+        {
+            var root = new GameObject("Prizes").transform;
+            var positions = new[]
+            {
+                new Vector3(-0.10f, 0.06f, -0.05f),
+                new Vector3(-0.02f, 0.06f,  0.04f),
+                new Vector3( 0.06f, 0.06f, -0.08f),
+                new Vector3( 0.10f, 0.06f,  0.06f),
+                new Vector3( 0.00f, 0.06f,  0.12f),
+            };
+
+            for (int i = 0; i < positions.Length; i++)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                go.name = "Figure_" + (i + 1);
+                go.transform.SetParent(root, false);
+                go.transform.position = positions[i];
+                go.transform.localScale = new Vector3(0.07f, 0.07f, 0.07f);
+                go.transform.rotation = Random.rotation;
+                go.layer = layer;
+                Paint(go, Color.HSVToRGB((i * 0.18f) % 1f, 0.7f, 0.9f));
+
+                var col = go.GetComponent<BoxCollider>();
+                if (mat != null) col.sharedMaterial = mat;
+
+                var rb = go.AddComponent<Rigidbody>();
+                rb.mass = 0.3f;
+                rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+                var prize = go.AddComponent<Prize>();
+                prize.prizeId = "figure_" + (i + 1);
+                prize.displayName = "Figure " + (i + 1);
+            }
+        }
+
+        // ---------- Wiring ----------
+
+        private static void WireClawController(ClawController claw, ClawGripSystem grip, PayoutManager payout)
+        {
+            var so = new SerializedObject(claw);
+            so.FindProperty("gantry").objectReferenceValue = claw.transform;
+            so.FindProperty("clawHead").objectReferenceValue = grip.transform; // ClawHead = ที่ติด grip
+            so.FindProperty("gripSystem").objectReferenceValue = grip;
+            so.FindProperty("payoutManager").objectReferenceValue = payout;
+            so.FindProperty("chuteHome").vector2Value = new Vector2(0.18f, 0.18f);
+            so.FindProperty("yTop").floatValue = 0f;
+            so.FindProperty("yBottom").floatValue = -0.45f;
+            so.FindProperty("xLimits").vector2Value = new Vector2(-0.22f, 0.22f);
+            so.FindProperty("zLimits").vector2Value = new Vector2(-0.22f, 0.22f);
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void WireSystems(ClawController claw, ClawGripSystem grip, PayoutManager payout,
+            PrizeCatchZone chute, Camera front, Camera side)
+        {
+            var systems = payout.gameObject;
+
+            var switcher = systems.AddComponent<CameraSwitcher>();
+            var sso = new SerializedObject(switcher);
+            sso.FindProperty("frontCamera").objectReferenceValue = front;
+            sso.FindProperty("sideCamera").objectReferenceValue = side;
+            sso.ApplyModifiedPropertiesWithoutUndo();
+
+            var hud = systems.AddComponent<DebugHUD>();
+            var hso = new SerializedObject(hud);
+            hso.FindProperty("claw").objectReferenceValue = claw;
+            hso.FindProperty("grip").objectReferenceValue = grip;
+            hso.FindProperty("payout").objectReferenceValue = payout;
+            hso.FindProperty("chute").objectReferenceValue = chute;
+            hso.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // ---------- Primitive helpers ----------
+
+        private static GameObject MakeBox(string name, Vector3 pos, Vector3 scale,
+            Transform parent, PhysicsMaterial mat, Color color)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            if (parent != null) go.transform.SetParent(parent, false);
+            go.transform.localPosition = pos;
+            go.transform.localScale = scale;
+            Paint(go, color);
+            if (mat != null)
+            {
+                var col = go.GetComponent<BoxCollider>();
+                if (col != null) col.sharedMaterial = mat;
+            }
+            return go;
+        }
+
+        private static void Paint(GameObject go, Color color)
+        {
+            var mr = go.GetComponent<MeshRenderer>();
+            if (mr == null) return;
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            var m = new Material(shader) { color = color };
+            mr.sharedMaterial = m;
+        }
+    }
+}
+#endif
