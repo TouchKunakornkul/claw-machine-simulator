@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(gh auth *)",
-      "PowerShell(gh auth status 2>&1)"
+      "PowerShell(gh auth status 2>&1)",
+      "WebFetch(domain:www.gamesasylum.com)",
+      "WebSearch"
     ]
   }
 }
