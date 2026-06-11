@@ -1,10 +1,13 @@
 {
   "dependencies": {
+    "com.unity.ai.assistant": "2.11.0-pre.2",
+    "com.unity.ai.inference": "2.6.1",
+    "com.unity.collections": "2.4.3",
     "com.unity.ugui": "2.0.0",
+    "com.unity.modules.audio": "1.0.0",
     "com.unity.modules.imgui": "1.0.0",
     "com.unity.modules.physics": "1.0.0",
     "com.unity.modules.ui": "1.0.0",
-    "com.unity.modules.uielements": "1.0.0",
-    "com.unity.modules.audio": "1.0.0"
+    "com.unity.modules.uielements": "1.0.0"
   }
 }
