@@ -275,10 +275,15 @@ namespace ClawMachine.EditorTools
             grabPoint.SetParent(clawHead, false);
             grabPoint.localPosition = new Vector3(0f, -0.16f, 0f);
 
-            // ขาดิ่ง: ยิง ray จาก GrabPoint หา prize เท่านั้น (กัน ray ชนขาตัวเอง)
+            // จุดวัด "ของอยู่ใต้หัว" = ก้น hub (ไม่ใช่ปลายขา!) — ขาจะดิ่งลึกจน shovel
+            // อยู่ใต้ก้นกล่องก่อนหัวจะแตะของแล้วค่อยหุบ (ช้อนได้จริง)
+            var dropProbe = new GameObject("DropProbe").transform;
+            dropProbe.SetParent(clawHead, false);
+            dropProbe.localPosition = new Vector3(0f, -0.05f, 0f);
+
             var cso = new SerializedObject(claw);
-            cso.FindProperty("dropProbe").objectReferenceValue = grabPoint;
-            cso.FindProperty("groundCheckDistance").floatValue = 0.012f; // เกือบแตะจริงเท่านั้น
+            cso.FindProperty("dropProbe").objectReferenceValue = dropProbe;
+            cso.FindProperty("groundCheckDistance").floatValue = 0.015f;
             cso.FindProperty("dropBlockingLayers").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             cso.ApplyModifiedPropertiesWithoutUndo();
 
@@ -289,7 +294,7 @@ namespace ClawMachine.EditorTools
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
             so.FindProperty("holdCheckRadius").floatValue = 0.05f;   // ตรวจว่ามีของในง่าม (HUD)
-            so.FindProperty("resistanceAngle").floatValue = 12f;     // ขาเบี่ยงเกินนี้ = โดนต้าน
+            so.FindProperty("resistanceAngle").floatValue = 18f;     // เผื่อขาเฉียด/ครูดตอนคร่อมกล่อง
             so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -305,7 +310,7 @@ namespace ClawMachine.EditorTools
             s.springStage = MachineSettings.SpringStage.Middle;
             s.armSize = MachineSettings.ArmSize.M;
             s.shovel = MachineSettings.ShovelType.W40;
-            s.openArmAngle = 35f;
+            s.openArmAngle = 50f; // spec จริง: กาง ~45-50° ช่องเปิดพอคร่อมกล่อง figure
             s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
             Directory.CreateDirectory("Assets/Physics");
             AssetDatabase.CreateAsset(s, SettingsPath);
@@ -337,8 +342,8 @@ namespace ClawMachine.EditorTools
             hinge.useSpring = true;
             var spring = hinge.spring;
             spring.targetPosition = -inwardSign * settings.openArmAngle; // ซ้าย=+ / ขวา=- (มิเรอร์)
-            spring.spring = 5f;
-            spring.damper = 1.5f;
+            spring.spring = 0.5f;   // หน่วย N·m/องศา — ขาจริงอ่อน แกว่งงอให้เห็น
+            spring.damper = 0.05f;
             hinge.spring = spring;
             var limits = hinge.limits;
             limits.min = -85f;
@@ -363,8 +368,9 @@ namespace ClawMachine.EditorTools
             var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tip.name = name + "_Shovel_" + settings.shovel;
             tip.transform.SetParent(pivot, false);
+            // เรขาคณิต spec จริง: กาง 50° ช่องเปิด ~17cm / หุบ 15° ปลายเกือบแตะ (ไม่ทับกัน)
             tip.transform.localScale = new Vector3(0.04f, 0.006f, settings.ShovelWidthMeters);
-            tip.transform.localPosition = new Vector3(inwardSign * 0.028f, -0.165f, 0f);
+            tip.transform.localPosition = new Vector3(inwardSign * 0.02f, -0.165f, 0f);
             tip.transform.localRotation = Quaternion.Euler(0f, 0f, -inwardSign * 25f);
             Paint(tip, metal);
             var tcol = tip.GetComponent<BoxCollider>();
@@ -490,6 +496,13 @@ namespace ClawMachine.EditorTools
             hso.FindProperty("payout").objectReferenceValue = payout;
             hso.FindProperty("chute").objectReferenceValue = chute;
             hso.ApplyModifiedPropertiesWithoutUndo();
+
+            // หน้าตั้งค่าสด (Tab) — จูนแรง/มุม/สปริงขณะเล่น
+            var panel = systems.AddComponent<TuningPanel>();
+            var pso = new SerializedObject(panel);
+            pso.FindProperty("grip").objectReferenceValue = grip;
+            pso.FindProperty("claw").objectReferenceValue = claw;
+            pso.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // ---------- Primitive helpers ----------

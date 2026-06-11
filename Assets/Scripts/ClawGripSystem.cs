@@ -34,18 +34,20 @@ namespace ClawMachine
         [SerializeField] private Transform leftArm;
         [SerializeField] private Transform rightArm;
 
-        [Header("มุมขา (องศา hinge, มิเรอร์สองข้าง)")]
-        [SerializeField] private float openAngle = 35f;
-        [SerializeField] private float closedAngle = 8f;
+        [Header("มุมขา (องศา hinge, มิเรอร์สองข้าง) — spec จริง: กาง ~45-50, หุบปลายเกือบแตะ")]
+        [SerializeField] private float openAngle = 50f;
+        [SerializeField] private float closedAngle = 15f;
 
-        [Header("ความแข็งสปริง hinge")]
+        [Header("ความแข็งสปริง hinge (หน่วย N·m/องศา — ค่าเล็กมากก็แข็งแล้ว)")]
         [Tooltip("ตอนกาง — อ่อนพอให้เบนหลบของได้ตอนดิ่ง")]
-        [SerializeField] private float springOpen = 5f;
-        [Tooltip("ตอนหุบแรงเต็ม (C1/payout) — มาจาก settings ถ้า assign ไว้")]
-        [SerializeField] private float springStrong = 35f;
+        [SerializeField] private float springOpen = 0.5f;
+        [Tooltip("ตอนหุบแรงเต็ม (C1/payout)")]
+        [SerializeField] private float springStrong = 1.8f;
         [Tooltip("ตอนยกรอบปกติ (kakuritsu C3) — อ่อนจนน้ำหนักของดันขากางได้")]
-        [SerializeField] private float springWeak = 3f;
-        [SerializeField] private float springDamper = 1.5f;
+        [SerializeField] private float springWeak = 0.25f;
+        [SerializeField] private float springDamper = 0.05f;
+        [Tooltip("ตัวแปลงแรงหนีบ (N) จาก MachineSettings -> ความแข็งสปริง")]
+        [SerializeField] private float springPerNewton = 0.05f;
 
         [Header("ตรวจสถานะ")]
         [Tooltip("ระยะรอบ grabPoint ที่ถือว่า 'มีของอยู่ในง่าม' (ใช้แสดงผล/หยุดดิ่ง)")]
@@ -72,16 +74,7 @@ namespace ClawMachine
             if (leftArm != null) leftHinge = leftArm.GetComponent<HingeJoint>();
             if (rightArm != null) rightHinge = rightArm.GetComponent<HingeJoint>();
 
-            // ตู้จริง: ค่าทั้งหมดมาจากแผงปรับ (MachineSettings)
-            if (settings != null)
-            {
-                openAngle = settings.openArmAngle;
-                springStrong = Mathf.Max(8f, settings.FullGripForce);
-                springWeak = Mathf.Max(0.5f, settings.LiftGripForce(isPayoutRound: false)
-                                              * (settings.segaMode ? 1f : settings.normalGripRatio));
-                // segaMode: แรงคงที่ทุกตา (springWeak = springStrong)
-                if (settings.segaMode) springWeak = springStrong;
-            }
+            ApplyFromSettings();
 
             // กันขาซ้าย-ขวาชน/เกี่ยวกันเองตอนหุบ (manual 13-4: shovels must not overlap)
             if (leftArm != null && rightArm != null)
@@ -107,19 +100,57 @@ namespace ClawMachine
                 || HingeDeviation(rightHinge) > resistanceAngle;
         }
 
+        // ---------- Live tuning API (ใช้โดย TuningPanel) ----------
+
+        public MachineSettings Settings => settings;
+        public float OpenAngleDeg { get => openAngle; set { openAngle = value; ReapplyPhase(); } }
+        public float ClosedAngleDeg { get => closedAngle; set { closedAngle = value; ReapplyPhase(); } }
+        public float SpringOpenVal { get => springOpen; set { springOpen = value; ReapplyPhase(); } }
+        public float SpringStrongVal { get => springStrong; set { springStrong = value; ReapplyPhase(); } }
+        public float SpringWeakVal { get => springWeak; set { springWeak = value; ReapplyPhase(); } }
+        public float DamperVal { get => springDamper; set { springDamper = value; ReapplyPhase(); } }
+        public float ResistanceAngleDeg { get => resistanceAngle; set => resistanceAngle = value; }
+        public float LeftHingeAngle => leftHinge != null ? leftHinge.angle : 0f;
+        public float RightHingeAngle => rightHinge != null ? rightHinge.angle : 0f;
+
+        /// <summary>คำนวณสปริงใหม่จาก MachineSettings (เรียกเมื่อหมุน POWER ฯลฯ)</summary>
+        public void ApplyFromSettings()
+        {
+            if (settings == null) return;
+            openAngle = settings.openArmAngle;
+            springStrong = Mathf.Max(0.05f, settings.FullGripForce * springPerNewton);
+            springWeak = settings.segaMode
+                ? springStrong // SEGA แท้: แรงคงที่ทุกตา
+                : Mathf.Max(0.02f, springStrong * settings.normalGripRatio);
+            ReapplyPhase();
+        }
+
+        /// <summary>apply มุม/สปริงของ phase ปัจจุบันใหม่ (หลังค่าโดนแก้สดๆ)</summary>
+        public void ReapplyPhase()
+        {
+            switch (Phase)
+            {
+                case GripPhase.Open: SetHinges(openAngle, springOpen); break;
+                case GripPhase.C3Normal: SetHinges(closedAngle, springWeak); break;
+                case GripPhase.C4Transport:
+                    SetHinges(closedAngle, Mathf.Lerp(springWeak, springStrong, 0.7f)); break;
+                default: SetHinges(closedAngle, springStrong); break;
+            }
+        }
+
         // ---------- API ที่ ClawController เรียก ----------
 
         public void OpenArms()
         {
             Phase = GripPhase.Open;
-            SetHinges(openAngle, springOpen);
+            ReapplyPhase();
         }
 
         /// <summary>หุบขาด้วยสปริงแรงเต็ม — shovel ช้อนเข้าใต้ของตามฟิสิกส์จริง ไม่มีการยึด</summary>
         public void CloseArms(GripPhase phase)
         {
             Phase = phase;
-            SetHinges(closedAngle, springStrong);
+            ReapplyPhase();
         }
 
         /// <summary>
@@ -129,11 +160,7 @@ namespace ClawMachine
         public void SetGripPhase(GripPhase phase)
         {
             Phase = phase;
-            float spring =
-                phase == GripPhase.C3Normal ? springWeak :
-                phase == GripPhase.C4Transport ? Mathf.Lerp(springWeak, springStrong, 0.7f) :
-                springStrong;
-            SetHinges(closedAngle, spring);
+            ReapplyPhase();
         }
 
         // ---------- ภายใน ----------

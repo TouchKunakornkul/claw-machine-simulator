@@ -68,6 +68,12 @@ namespace ClawMachine
         public ClawState State { get; private set; } = ClawState.Idle;
         public int CurrentPlayCount => payoutManager != null ? payoutManager.PlayCount : 0;
 
+        // Live tuning API (ใช้โดย TuningPanel)
+        public float DescentSpeedVal { get => descentSpeed; set => descentSpeed = value; }
+        public float AscentSpeedVal { get => ascentSpeed; set => ascentSpeed = value; }
+        public float HoldDurationSec { get => holdDuration; set => holdDuration = value; }
+        public float GroundCheckDist { get => groundCheckDistance; set => groundCheckDistance = value; }
+
         private float stateTimer;
         private bool isPayoutRound;
 
