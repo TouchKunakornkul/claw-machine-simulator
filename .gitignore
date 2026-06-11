@@ -37,6 +37,9 @@ ExportedObj/
 .DS_Store
 Thumbs.db
 
+# Claude Code MCP config (path เฉพาะเครื่อง)
+.mcp.json
+
 # Crashlytics / Unity diagnostics
 crashlytics-build.properties
 sysinfo.txt
