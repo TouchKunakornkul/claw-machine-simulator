@@ -288,7 +288,8 @@ namespace ClawMachine.EditorTools
             so.FindProperty("leftArm").objectReferenceValue = leftArm;
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
-            so.FindProperty("grabRadius").floatValue = 0.09f; // ครอบกล่อง figure ที่ใหญ่ขึ้น
+            so.FindProperty("contactRadius").floatValue = 0.02f;  // หยุดดิ่งเมื่อแตะจริง
+            so.FindProperty("latchRadius").floatValue = 0.05f;    // คว้าเมื่อของอยู่ในง่าม
             so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             so.ApplyModifiedPropertiesWithoutUndo();
 

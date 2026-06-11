@@ -166,10 +166,12 @@ namespace ClawMachine
 
         private void TickGripping()
         {
-            // C2: ค้างแรงหุบไว้
+            // C2: ค้างแรงหุบไว้ ให้ขา physics หุบจริงจนสุด
             stateTimer += Time.deltaTime;
             if (stateTimer >= holdDuration)
             {
+                // ขาหุบเสร็จแล้ว ค่อยดูว่าของอยู่ในง่ามจริงไหม (ไม่ใช่ดูดจากระยะไกล)
+                gripSystem.TryLatch();
                 EnterLifting();
             }
         }

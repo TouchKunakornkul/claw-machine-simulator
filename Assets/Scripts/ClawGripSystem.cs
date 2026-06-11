@@ -57,7 +57,10 @@ namespace ClawMachine
         [Header("Grab detection")]
         [Tooltip("จุดกึ่งกลางระหว่างปลายขา ใช้หา prize ที่จะยึด")]
         [SerializeField] private Transform grabPoint;
-        [SerializeField] private float grabRadius = 0.09f;
+        [Tooltip("ระยะ 'สัมผัสจริง' สำหรับหยุดการดิ่ง — ต้องเล็ก (ปลายขาแตะของจริงๆ)")]
+        [SerializeField] private float contactRadius = 0.02f;
+        [Tooltip("ระยะคว้าหลังขาหุบเสร็จ — ของต้องอยู่ในง่ามจริงถึงจะเกาะ")]
+        [SerializeField] private float latchRadius = 0.045f;
         [SerializeField] private LayerMask prizeLayer = ~0;
 
         public GripPhase Phase { get; private set; } = GripPhase.Open;
@@ -108,12 +111,12 @@ namespace ClawMachine
                 heldPrize = null;
         }
 
-        /// <summary>มี prize อยู่ในระยะคีบใต้หัวคีบหรือยัง</summary>
+        /// <summary>ปลายขา "แตะ" ของจริงหรือยัง (ระยะสั้นมาก) — ใช้หยุดการดิ่ง</summary>
         public bool PrizeInRange()
         {
             if (grabPoint == null) return false;
             return Physics.CheckSphere(
-                grabPoint.position, grabRadius, prizeLayer, QueryTriggerInteraction.Ignore);
+                grabPoint.position, contactRadius, prizeLayer, QueryTriggerInteraction.Ignore);
         }
 
         // ---------- API ที่ ClawController เรียก ----------
@@ -125,11 +128,21 @@ namespace ClawMachine
             ReleasePrize();
         }
 
+        /// <summary>สั่งหุบขา (ยังไม่คว้า — joint จะเกิดตอน TryLatch หลังขาหุบเสร็จ)</summary>
         public void CloseArms(GripPhase phase)
         {
             Phase = phase;
             SetHinges(closedAngle, springClose);
+        }
+
+        /// <summary>
+        /// เรียกหลังขาหุบเสร็จ (จบ C2 hold): ถ้ามีของอยู่ในง่ามจริงค่อยเกาะ
+        /// ถ้าไม่มี = คว้าลม (ขาอาจแค่ดัน/เขี่ยของ — สมจริงแบบ tatehame)
+        /// </summary>
+        public bool TryLatch()
+        {
             TryGrabPrize();
+            return IsHolding;
         }
 
         public void SetGripPhase(GripPhase phase)
@@ -180,7 +193,7 @@ namespace ClawMachine
             if (heldJoint != null || grabPoint == null) return;
 
             Collider[] hits = Physics.OverlapSphere(
-                grabPoint.position, grabRadius, prizeLayer, QueryTriggerInteraction.Ignore);
+                grabPoint.position, latchRadius, prizeLayer, QueryTriggerInteraction.Ignore);
 
             Prize closest = null;
             float best = float.MaxValue;
@@ -221,8 +234,10 @@ namespace ClawMachine
         {
             if (grabPoint != null)
             {
+                Gizmos.color = Color.red;
+                Gizmos.DrawWireSphere(grabPoint.position, contactRadius);
                 Gizmos.color = Color.yellow;
-                Gizmos.DrawWireSphere(grabPoint.position, grabRadius);
+                Gizmos.DrawWireSphere(grabPoint.position, latchRadius);
             }
         }
     }
