@@ -36,9 +36,13 @@ namespace ClawMachine
         [Header("ปลายขา shovel (กว้างขึ้น = รับของกว้างขึ้น)")]
         public ShovelType shovel = ShovelType.W40;
 
-        // ===== 13-5: มุมกางขา =====
+        // ===== 13-4: สกรูปรับระยะห่าง shovel ตอนหุบ (overlap adjustment screw) =====
+        [Header("ระยะห่างปลาย shovel ตอนหุบ (cm) — manual: ต้องไม่ overlap")]
+        [Range(0f, 3f)] public float shovelGapCm = 0.5f;
+
+        // ===== 13-5: มุมกางขา (เลื่อน sensor bracket ด้าน A = กว้าง / B = แคบ) =====
         [Header("มุมกางขา (องศา)")]
-        [Range(20f, 60f)] public float openArmAngle = 35f;
+        [Range(20f, 60f)] public float openArmAngle = 50f;
 
         // ===== โหมดจ่ายรางวัล =====
         [Header("โหมดจ่ายรางวัล")]

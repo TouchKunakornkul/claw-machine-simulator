@@ -311,6 +311,7 @@ namespace ClawMachine.EditorTools
             s.armSize = MachineSettings.ArmSize.M;
             s.shovel = MachineSettings.ShovelType.W40;
             s.openArmAngle = 50f; // spec จริง: กาง ~45-50° ช่องเปิดพอคร่อมกล่อง figure
+            s.shovelGapCm = 0.5f; // 13-4: ปลายเกือบแตะ ไม่ overlap
             s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
             Directory.CreateDirectory("Assets/Physics");
             AssetDatabase.CreateAsset(s, SettingsPath);
@@ -497,11 +498,18 @@ namespace ClawMachine.EditorTools
             hso.FindProperty("chute").objectReferenceValue = chute;
             hso.ApplyModifiedPropertiesWithoutUndo();
 
-            // หน้าตั้งค่าสด (Tab) — จูนแรง/มุม/สปริงขณะเล่น
+            // ให้ PayoutManager อ่าน payoutEveryN จาก settings asset เดียวกัน
+            var settingsAsset = AssetDatabase.LoadAssetAtPath<MachineSettings>(SettingsPath);
+            var payso = new SerializedObject(payout);
+            payso.FindProperty("settings").objectReferenceValue = settingsAsset;
+            payso.ApplyModifiedPropertiesWithoutUndo();
+
+            // แผงปรับตู้ (Tab) — จัดวางตาม manual จริง
             var panel = systems.AddComponent<TuningPanel>();
             var pso = new SerializedObject(panel);
             pso.FindProperty("grip").objectReferenceValue = grip;
             pso.FindProperty("claw").objectReferenceValue = claw;
+            pso.FindProperty("payout").objectReferenceValue = payout;
             pso.ApplyModifiedPropertiesWithoutUndo();
         }
 

@@ -10,7 +10,10 @@ namespace ClawMachine
     /// </summary>
     public class PayoutManager : MonoBehaviour
     {
-        [Header("อัตราจ่าย")]
+        [Header("การตั้งค่าตู้ (ถ้า assign จะใช้ payoutEveryN จาก asset แทน)")]
+        [SerializeField] private MachineSettings settings;
+
+        [Header("อัตราจ่าย (fallback เมื่อไม่มี settings)")]
         [Tooltip("จ่ายรางวัล (แรงเต็ม) ทุกครั้งที่ N — เครื่องจริง 10–18")]
         [Min(1)]
         [SerializeField] private int payoutEveryN = 12;
@@ -20,15 +23,15 @@ namespace ClawMachine
         [SerializeField] private bool forceNextPayout = false;
 
         public int PlayCount { get; private set; }
-        public int PayoutEveryN => payoutEveryN;
+        public int PayoutEveryN => settings != null ? settings.payoutEveryN : payoutEveryN;
         /// <summary>เหลืออีกกี่ครั้งถึงรอบจ่าย (1 = ครั้งถัดไปจ่าย)</summary>
         public int PlaysUntilPayout
         {
             get
             {
                 if (forceNextPayout) return 1;
-                int into = PlayCount % payoutEveryN;
-                return payoutEveryN - into;
+                int into = PlayCount % PayoutEveryN;
+                return PayoutEveryN - into;
             }
         }
 
@@ -45,7 +48,7 @@ namespace ClawMachine
                 return true;
             }
 
-            return PlayCount % payoutEveryN == 0;
+            return PlayCount % PayoutEveryN == 0;
         }
 
         /// <summary>เปิด/ปิดบังคับจ่ายรอบหน้า (ผูกกับปุ่ม debug ได้)</summary>

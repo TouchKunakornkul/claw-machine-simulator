@@ -113,16 +113,45 @@ namespace ClawMachine
         public float LeftHingeAngle => leftHinge != null ? leftHinge.angle : 0f;
         public float RightHingeAngle => rightHinge != null ? rightHinge.angle : 0f;
 
-        /// <summary>คำนวณสปริงใหม่จาก MachineSettings (เรียกเมื่อหมุน POWER ฯลฯ)</summary>
+        // เรขาคณิตขา (ต้องตรงกับ ClawSceneBuilder): ความยาว pivot->shovel และระยะ shovel ยื่นเข้าใน
+        private const float ArmLengthM = 0.165f;
+        private const float ShovelReachM = 0.04f;
+
+        /// <summary>คำนวณค่าทั้งหมดใหม่จาก MachineSettings (เรียกเมื่อหมุนแผงปรับ)</summary>
         public void ApplyFromSettings()
         {
             if (settings == null) return;
+
+            // 13-5: มุมกางขา
             openAngle = settings.openArmAngle;
+
+            // 13-4: สกรูปรับระยะห่าง shovel -> แปลงเป็นมุมหุบ (gap = 2*(sinθ*L - reach))
+            float sinClosed = (ShovelReachM + settings.shovelGapCm * 0.01f / 2f) / ArmLengthM;
+            closedAngle = Mathf.Asin(Mathf.Clamp(sinClosed, 0.05f, 0.95f)) * Mathf.Rad2Deg;
+
+            // 11-1 + 13-3: POWER × ตำแหน่งสปริง × ขนาดขา -> ความแข็งสปริง
             springStrong = Mathf.Max(0.05f, settings.FullGripForce * springPerNewton);
             springWeak = settings.segaMode
                 ? springStrong // SEGA แท้: แรงคงที่ทุกตา
                 : Mathf.Max(0.02f, springStrong * settings.normalGripRatio);
+
+            // 13-4: เปลี่ยนความกว้างแผ่น shovel (W30/W40/W60) สดๆ
+            ApplyShovelWidth(leftArm);
+            ApplyShovelWidth(rightArm);
+
             ReapplyPhase();
+        }
+
+        private void ApplyShovelWidth(Transform arm)
+        {
+            if (arm == null || settings == null) return;
+            foreach (Transform child in arm)
+            {
+                if (!child.name.Contains("_Shovel")) continue;
+                var s = child.localScale;
+                s.z = settings.ShovelWidthMeters;
+                child.localScale = s;
+            }
         }
 
         /// <summary>apply มุม/สปริงของ phase ปัจจุบันใหม่ (หลังค่าโดนแก้สดๆ)</summary>
