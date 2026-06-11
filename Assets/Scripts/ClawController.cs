@@ -40,6 +40,8 @@ namespace ClawMachine
 
         [Header("ตำแหน่ง home เหนือท่อรับของ (local X/Z)")]
         [SerializeField] private Vector2 chuteHome = new Vector2(0.22f, -0.22f);
+        [Tooltip("true = ยกแล้วลากกลับไปปล่อยที่ chuteHome (ตู้แบบมีท่อมุม) / false = ปล่อยตรงจุดที่คีบ (ตู้ hashi-watashi คานขนาน)")]
+        [SerializeField] private bool returnToChute = true;
 
         [Header("ความเร็ว (m/s) — อ้างอิงเครื่องจริง")]
         [SerializeField] private float horizontalSpeed = 0.07f;
@@ -181,12 +183,21 @@ namespace ClawMachine
             {
                 p.y = yTop;
                 clawHead.localPosition = p;
-                EnterReturning();
+                if (returnToChute)
+                    EnterReturning();
+                else
+                    EnterReleasingInPlace(); // ปล่อยตรงจุด (hashi-watashi)
             }
             else
             {
                 clawHead.localPosition = p;
             }
+        }
+
+        private void EnterReleasingInPlace()
+        {
+            State = ClawState.Releasing;
+            stateTimer = 0f;
         }
 
         // ---------- C4: Returning ----------
