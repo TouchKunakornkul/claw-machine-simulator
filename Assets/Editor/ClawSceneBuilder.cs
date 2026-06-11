@@ -120,18 +120,55 @@ namespace ClawMachine.EditorTools
             var root = new GameObject("Cabinet").transform;
 
             // พื้นตู้ (ผิวบนที่ y=0)
-            var floor = MakeBox("Floor", new Vector3(0f, -0.025f, 0f),
+            MakeBox("Floor", new Vector3(0f, -0.025f, 0f),
                 new Vector3(0.6f, 0.05f, 0.6f), root, mat, new Color(0.2f, 0.2f, 0.22f));
 
-            // ผนัง 4 ด้าน สูง 0.3 หนา 0.02 (เตี้ยพอให้กล้องมองเข้า)
-            const float h = 0.3f, t = 0.02f, half = 0.3f;
-            MakeBox("Wall_Back", new Vector3(0f, h / 2f, half), new Vector3(0.6f, h, t), root, mat, WallColor());
-            MakeBox("Wall_Front", new Vector3(0f, h / 2f, -half), new Vector3(0.6f, h, t), root, mat, WallColor());
-            MakeBox("Wall_Left", new Vector3(-half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, WallColor());
-            MakeBox("Wall_Right", new Vector3(half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, WallColor());
+            // ผนัง 4 ด้าน = กระจกใส (โปร่งแสง มองเห็นของข้างใน)
+            var glass = CreateGlassMaterial();
+            const float h = 0.35f, t = 0.012f, half = 0.3f;
+            var walls = new[]
+            {
+                MakeBox("Glass_Back", new Vector3(0f, h / 2f, half), new Vector3(0.6f, h, t), root, mat, Color.white),
+                MakeBox("Glass_Front", new Vector3(0f, h / 2f, -half), new Vector3(0.6f, h, t), root, mat, Color.white),
+                MakeBox("Glass_Left", new Vector3(-half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, Color.white),
+                MakeBox("Glass_Right", new Vector3(half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, Color.white),
+            };
+            foreach (var w in walls)
+                w.GetComponent<MeshRenderer>().sharedMaterial = glass;
         }
 
-        private static Color WallColor() => new Color(0.15f, 0.35f, 0.55f, 1f);
+        // กระจกใสสำหรับผนังตู้ — รองรับทั้ง built-in Standard และ URP
+        private static Material CreateGlassMaterial()
+        {
+            var glassColor = new Color(0.55f, 0.78f, 0.95f, 0.14f);
+            var std = Shader.Find("Standard");
+            if (std != null)
+            {
+                var m = new Material(std);
+                m.SetFloat("_Mode", 3f); // Transparent
+                m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                m.SetInt("_ZWrite", 0);
+                m.DisableKeyword("_ALPHATEST_ON");
+                m.EnableKeyword("_ALPHABLEND_ON");
+                m.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                m.renderQueue = 3000;
+                m.color = glassColor;
+                return m;
+            }
+
+            // URP fallback
+            var urp = Shader.Find("Universal Render Pipeline/Lit");
+            var mm = new Material(urp);
+            mm.SetFloat("_Surface", 1f); // Transparent
+            mm.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mm.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mm.SetInt("_ZWrite", 0);
+            mm.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mm.renderQueue = 3000;
+            mm.color = glassColor;
+            return mm;
+        }
 
         private static PrizeCatchZone BuildChute()
         {
@@ -159,16 +196,30 @@ namespace ClawMachine.EditorTools
             clawHead.SetParent(gantry, false);
             clawHead.localPosition = Vector3.zero;
 
-            // ลำตัวหัวคีบ (visual)
-            var body = MakeBox("HeadBody", Vector3.zero, new Vector3(0.07f, 0.05f, 0.07f),
-                clawHead, null, new Color(0.85f, 0.7f, 0.2f));
-            Object.DestroyImmediate(body.GetComponent<BoxCollider>());
+            // ลำตัวหัวคีบ = จานครอบ (saucer) แบบ UFO catcher
+            var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            body.name = "HeadBody";
+            body.transform.SetParent(clawHead, false);
+            body.transform.localScale = new Vector3(0.09f, 0.025f, 0.09f); // แบนเป็นจาน
+            body.transform.localPosition = new Vector3(0f, 0.01f, 0f);
+            Paint(body, new Color(0.85f, 0.7f, 0.2f));
+            Object.DestroyImmediate(body.GetComponent<Collider>());
+
+            // แกนกลางเชื่อมขา
+            var hub = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            hub.name = "Hub";
+            hub.transform.SetParent(clawHead, false);
+            hub.transform.localScale = new Vector3(0.03f, 0.04f, 0.03f);
+            hub.transform.localPosition = new Vector3(0f, -0.025f, 0f);
+            Paint(hub, new Color(0.3f, 0.3f, 0.33f));
+            Object.DestroyImmediate(hub.GetComponent<Collider>());
 
             var grip = clawHead.gameObject.AddComponent<ClawGripSystem>();
 
-            // ขา 2 ข้าง — pivot ที่ด้านบน (local y=-0.04 ใต้หัว) mesh ยื่นลง
-            var leftArm = BuildArm("LeftArm", clawHead, mat);
-            var rightArm = BuildArm("RightArm", clawHead, mat);
+            // ขา 2 ข้าง — ง่ามมีปลายงอเข้า (hooked prong) pivot ที่แกนกลาง
+            // inwardSign: ทิศที่ปลายขางอเข้าหากึ่งกลาง (ซ้าย -1 / ขวา +1)
+            var leftArm = BuildArm("LeftArm", clawHead, mat, -1f);
+            var rightArm = BuildArm("RightArm", clawHead, mat, 1f);
 
             // GrabPoint กึ่งกลางปลายขา
             var grabPoint = new GameObject("GrabPoint").transform;
@@ -193,22 +244,35 @@ namespace ClawMachine.EditorTools
             return (claw, grip);
         }
 
-        private static Transform BuildArm(string name, Transform parent, PhysicsMaterial mat)
+        private static Transform BuildArm(string name, Transform parent, PhysicsMaterial mat, float inwardSign)
         {
-            // pivot empty
+            var metal = new Color(0.78f, 0.78f, 0.82f);
+
+            // pivot ที่แกนกลางหัวคีบ — หมุนรอบ Z เพื่อหุบ/กาง
             var pivot = new GameObject(name).transform;
             pivot.SetParent(parent, false);
-            pivot.localPosition = new Vector3(0f, -0.04f, 0f);
+            pivot.localPosition = new Vector3(0f, -0.035f, 0f);
 
-            // mesh ขา: cube ยาวยื่นลง ปลายบนชิด pivot
-            var arm = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            arm.name = name + "_Mesh";
-            arm.transform.SetParent(pivot, false);
-            arm.transform.localScale = new Vector3(0.02f, 0.12f, 0.02f);
-            arm.transform.localPosition = new Vector3(0f, -0.06f, 0f);
-            Paint(arm, new Color(0.75f, 0.75f, 0.8f));
-            var col = arm.GetComponent<BoxCollider>();
-            if (mat != null) col.sharedMaterial = mat;
+            // ท่อนบน: แท่งยาวยื่นลง
+            var upper = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            upper.name = name + "_Upper";
+            upper.transform.SetParent(pivot, false);
+            upper.transform.localScale = new Vector3(0.018f, 0.11f, 0.022f);
+            upper.transform.localPosition = new Vector3(0f, -0.055f, 0f);
+            Paint(upper, metal);
+            var ucol = upper.GetComponent<BoxCollider>();
+            if (mat != null) ucol.sharedMaterial = mat;
+
+            // ปลายงอเข้า (hook tip): เอียงเข้าหากึ่งกลาง
+            var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            tip.name = name + "_Tip";
+            tip.transform.SetParent(pivot, false);
+            tip.transform.localScale = new Vector3(0.018f, 0.055f, 0.022f);
+            tip.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 38f);
+            tip.transform.localPosition = new Vector3(inwardSign * 0.013f, -0.125f, 0f);
+            Paint(tip, metal);
+            var tcol = tip.GetComponent<BoxCollider>();
+            if (mat != null) tcol.sharedMaterial = mat;
 
             return pivot;
         }
