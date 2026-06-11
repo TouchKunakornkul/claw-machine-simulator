@@ -11,6 +11,11 @@ namespace ClawMachine
     [RequireComponent(typeof(Collider))]
     public class PrizeCatchZone : MonoBehaviour
     {
+        [Header("Respawn (โหมดทดลองเล่น)")]
+        [Tooltip("true = คีบได้แล้ววางกล่องกลับท่าตั้งต้นให้เล่นใหม่ / false = ทำลายทิ้ง")]
+        [SerializeField] private bool respawnAfterCatch = true;
+        [SerializeField] private float respawnDelay = 1.2f;
+
         [Header("Debug")]
         [SerializeField] private bool logToConsole = true;
 
@@ -35,8 +40,18 @@ namespace ClawMachine
 
             OnPrizeCaught?.Invoke(prize);
 
-            // MVP: เอาออกจากฉากหลังเก็บ (ยังไม่ทำ inventory)
-            Destroy(prize.gameObject);
+            if (respawnAfterCatch)
+                StartCoroutine(RespawnRoutine(prize));
+            else
+                Destroy(prize.gameObject);
+        }
+
+        private System.Collections.IEnumerator RespawnRoutine(Prize prize)
+        {
+            prize.gameObject.SetActive(false);
+            yield return new WaitForSeconds(respawnDelay);
+            prize.ResetToSpawn();
+            prize.gameObject.SetActive(true);
         }
     }
 }

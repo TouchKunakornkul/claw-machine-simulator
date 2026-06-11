@@ -113,7 +113,7 @@ namespace ClawMachine
         public float LeftHingeAngle => leftHinge != null ? leftHinge.angle : 0f;
         public float RightHingeAngle => rightHinge != null ? rightHinge.angle : 0f;
 
-        // เรขาคณิตขา (ต้องตรงกับ ClawSceneBuilder): ความยาว pivot->shovel และระยะ shovel ยื่นเข้าใน
+        // เรขาคณิตขาขนาด M (ต้องตรงกับ ClawSceneBuilder): ความยาว pivot->shovel และระยะ shovel ยื่นเข้าใน
         private const float ArmLengthM = 0.165f;
         private const float ShovelReachM = 0.04f;
 
@@ -122,11 +122,19 @@ namespace ClawMachine
         {
             if (settings == null) return;
 
+            // 13-1: เปลี่ยนขา S/M/L = เปลี่ยนความยาวขาจริง (สเกลรอบ pivot ซึ่งเป็นจุดหมุน)
+            float armScale = settings.ArmSizeScale;
+            if (leftArm != null) leftArm.localScale = Vector3.one * armScale;
+            if (rightArm != null) rightArm.localScale = Vector3.one * armScale;
+
             // 13-5: มุมกางขา
             openAngle = settings.openArmAngle;
 
             // 13-4: สกรูปรับระยะห่าง shovel -> แปลงเป็นมุมหุบ (gap = 2*(sinθ*L - reach))
-            float sinClosed = (ShovelReachM + settings.shovelGapCm * 0.01f / 2f) / ArmLengthM;
+            // ใช้ความยาวตามขนาดขาปัจจุบัน
+            float len = ArmLengthM * armScale;
+            float reach = ShovelReachM * armScale;
+            float sinClosed = (reach + settings.shovelGapCm * 0.01f / 2f) / len;
             closedAngle = Mathf.Asin(Mathf.Clamp(sinClosed, 0.05f, 0.95f)) * Mathf.Rad2Deg;
 
             // 11-1 + 13-3: POWER × ตำแหน่งสปริง × ขนาดขา -> ความแข็งสปริง
@@ -136,20 +144,21 @@ namespace ClawMachine
                 : Mathf.Max(0.02f, springStrong * settings.normalGripRatio);
 
             // 13-4: เปลี่ยนความกว้างแผ่น shovel (W30/W40/W60) สดๆ
-            ApplyShovelWidth(leftArm);
-            ApplyShovelWidth(rightArm);
+            // หารด้วย armScale เพื่อให้ W30/40/60 เป็นขนาดสัมบูรณ์ ไม่โดนสเกลขาคูณซ้ำ
+            ApplyShovelWidth(leftArm, armScale);
+            ApplyShovelWidth(rightArm, armScale);
 
             ReapplyPhase();
         }
 
-        private void ApplyShovelWidth(Transform arm)
+        private void ApplyShovelWidth(Transform arm, float armScale)
         {
             if (arm == null || settings == null) return;
             foreach (Transform child in arm)
             {
                 if (!child.name.Contains("_Shovel")) continue;
                 var s = child.localScale;
-                s.z = settings.ShovelWidthMeters;
+                s.z = settings.ShovelWidthMeters / Mathf.Max(0.1f, armScale);
                 child.localScale = s;
             }
         }

@@ -70,6 +70,14 @@ namespace ClawMachine
             armSize == ArmSize.S ? 0.75f :
             armSize == ArmSize.L ? 1.3f : 1f;
 
+        /// <summary>
+        /// สเกลความยาวขาจริง (13-1: เปลี่ยนขา S/M/L = เปลี่ยนชิ้นส่วนจริง)
+        /// อิง spec ขา pivot->ปลาย 12-18cm: S=13.2 / M=16.5 / L=19.8 cm
+        /// </summary>
+        public float ArmSizeScale =>
+            armSize == ArmSize.S ? 0.8f :
+            armSize == ArmSize.L ? 1.2f : 1f;
+
         /// <summary>ความกว้างปลายขาเป็นเมตร (W30=3cm, W40=4cm, W60=6cm)</summary>
         public float ShovelWidthMeters =>
             shovel == ShovelType.W30 ? 0.03f :

@@ -428,13 +428,11 @@ namespace ClawMachine.EditorTools
             var boxSize = new Vector3(0.08f, 0.07f, 0.16f);
             float restY = BarTopY + boxSize.y / 2f + 0.001f;
 
-            // (x, มุมหมุนรอบ Y) — ไล่ความยากจากตั้งฉาก(ยาก) ไปเกือบขนาน(ง่าย ใกล้ร่วง)
-            // มุมที่ extent ใน Z = ช่อง 10cm อยู่ราว 82° (เกินกว่านั้นร่วงเอง)
+            // โหมดทดลอง: กล่องเดียว วางท่ามาตรฐานร้านจริง — พาดขวางคานตรงๆ กลางตู้
+            // (คีบได้แล้ว PrizeCatchZone จะ respawn กลับท่านี้ให้เล่นต่อ)
             var setups = new[]
             {
-                new Vector2(-0.15f, 0f),   // ตั้งฉากคาน — ยาก
-                new Vector2(0.00f, 45f),   // เฉียง — ปานกลาง
-                new Vector2(0.16f, 78f),   // เกือบขนาน — ง่าย ดันนิดเดียวร่วง
+                new Vector2(0f, 0f),
             };
 
             for (int i = 0; i < setups.Length; i++)
