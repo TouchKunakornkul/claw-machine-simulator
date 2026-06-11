@@ -258,11 +258,17 @@ namespace ClawMachine.EditorTools
             Object.DestroyImmediate(hub.GetComponent<Collider>());
 
             var grip = clawHead.gameObject.AddComponent<ClawGripSystem>();
+            var headRb = clawHead.GetComponent<Rigidbody>(); // มาจาก RequireComponent ของ grip
+            headRb.isKinematic = true;
+            headRb.useGravity = false;
 
-            // ขา 2 ข้าง — ง่ามมีปลายงอเข้า (hooked prong) pivot ที่แกนกลาง
+            // การตั้งค่าตู้แบบ asset (แผงปรับ SEGA: POWER/สปริง/ขนาดขา/shovel)
+            var settings = CreateMachineSettings();
+
+            // ขา 2 ข้าง — Rigidbody + HingeJoint ห้อยจากหัว แกว่งเบนหลบของได้จริง
             // inwardSign: ทิศที่ปลายขางอเข้าหากึ่งกลาง (ซ้าย -1 / ขวา +1)
-            var leftArm = BuildArm("LeftArm", clawHead, mat, -1f);
-            var rightArm = BuildArm("RightArm", clawHead, mat, 1f);
+            var leftArm = BuildArm("LeftArm", clawHead, mat, -1f, headRb, settings);
+            var rightArm = BuildArm("RightArm", clawHead, mat, 1f, headRb, settings);
 
             // GrabPoint กึ่งกลางปลายขา
             var grabPoint = new GameObject("GrabPoint").transform;
@@ -278,6 +284,7 @@ namespace ClawMachine.EditorTools
 
             // wire grip ผ่าน SerializedObject (field เป็น private [SerializeField])
             var so = new SerializedObject(grip);
+            so.FindProperty("settings").objectReferenceValue = settings;
             so.FindProperty("leftArm").objectReferenceValue = leftArm;
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
@@ -288,8 +295,26 @@ namespace ClawMachine.EditorTools
             return (claw, grip);
         }
 
+        private const string SettingsPath = "Assets/Physics/DefaultMachineSettings.asset";
+
+        private static MachineSettings CreateMachineSettings()
+        {
+            var s = ScriptableObject.CreateInstance<MachineSettings>();
+            s.power = 55;
+            s.springStage = MachineSettings.SpringStage.Middle;
+            s.armSize = MachineSettings.ArmSize.M;
+            s.shovel = MachineSettings.ShovelType.W40;
+            s.openArmAngle = 35f;
+            s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
+            Directory.CreateDirectory("Assets/Physics");
+            AssetDatabase.CreateAsset(s, SettingsPath);
+            return s;
+        }
+
         // ง่ามคีบ = นิ้วโค้ง 2 ท่อน (capsule) + ปลายแหลมงอเข้า แบบ UFO catcher จริง
-        private static Transform BuildArm(string name, Transform parent, PhysicsMaterial mat, float inwardSign)
+        // ขาเป็น Rigidbody ห้อยจากหัวด้วย HingeJoint -> เบนหลบของได้ (สมจริงตาม manual: ขาสปริง)
+        private static Transform BuildArm(string name, Transform parent, PhysicsMaterial mat,
+            float inwardSign, Rigidbody headAnchor, MachineSettings settings)
         {
             var metal = new Color(0.82f, 0.82f, 0.87f);
 
@@ -297,6 +322,28 @@ namespace ClawMachine.EditorTools
             var pivot = new GameObject(name).transform;
             pivot.SetParent(parent, false);
             pivot.localPosition = new Vector3(0f, -0.03f, 0f);
+
+            // physics: ขาห้อยจากหัวคีบ แกว่ง/เบนได้รอบแกน Z
+            var rb = pivot.gameObject.AddComponent<Rigidbody>();
+            rb.mass = 0.05f;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+
+            var hinge = pivot.gameObject.AddComponent<HingeJoint>();
+            hinge.connectedBody = headAnchor;
+            hinge.anchor = Vector3.zero;            // หมุนรอบจุดบนสุดของขา
+            hinge.axis = Vector3.forward;           // แกน Z
+            hinge.useSpring = true;
+            var spring = hinge.spring;
+            spring.targetPosition = -inwardSign * settings.openArmAngle; // ซ้าย=+ / ขวา=- (มิเรอร์)
+            spring.spring = 5f;
+            spring.damper = 1.5f;
+            hinge.spring = spring;
+            var limits = hinge.limits;
+            limits.min = -85f;
+            limits.max = 85f;
+            hinge.limits = limits;
+            hinge.useLimits = true;
 
             // ท่อนบน (shoulder): ยื่นลงบานออกเล็กน้อย
             var shoulder = MakeCapsule(name + "_Shoulder", pivot, mat, metal);
@@ -310,11 +357,11 @@ namespace ClawMachine.EditorTools
             finger.localPosition = new Vector3(-inwardSign * 0.004f, -0.12f, 0f);
             finger.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 26f);
 
-            // ปลายแหลมงอเข้า (จุดเกี่ยวของรางวัล)
+            // ปลายแหลมงอเข้า = shovel (13-4: เลือกความกว้างตามชนิดของรางวัล W30/W40/W60)
             var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            tip.name = name + "_Tip";
+            tip.name = name + "_Shovel_" + settings.shovel;
             tip.transform.SetParent(pivot, false);
-            tip.transform.localScale = new Vector3(0.013f, 0.03f, 0.013f);
+            tip.transform.localScale = new Vector3(0.013f, 0.03f, settings.ShovelWidthMeters);
             tip.transform.localPosition = new Vector3(inwardSign * 0.022f, -0.16f, 0f);
             tip.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 55f);
             Paint(tip, metal);

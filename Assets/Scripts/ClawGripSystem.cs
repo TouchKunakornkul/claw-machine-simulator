@@ -15,59 +15,57 @@ namespace ClawMachine
     }
 
     /// <summary>
-    /// ควบคุมการหุบ/กางขา 2 ขา และ "แรงยึด" ของรางวัล
+    /// ควบคุมขา 2 ข้างแบบ physics จริง (HingeJoint + spring) ตามกลไก UFO Catcher
     ///
-    /// โมเดลฟิสิกส์ (อ้างอิง implementation จริงของ czazuaga/Claw_Machine_Simulator + งานวิจัย):
-    /// - ของรางวัลเป็น Rigidbody dynamic ตลอด (วางบนคานได้ ขาดันได้จริง)
-    /// - ตอนหุบขา (C1) ถ้ามี prize อยู่ในวงคีบ จะผูก FixedJoint กับหัวคีบ (kinematic anchor)
-    /// - breakForce ของ joint = แรงคีบ phase ปัจจุบัน
-    ///   * รอบปกติ (C3Normal) แรงต่ำกว่าน้ำหนักของ -> joint ขาดตอนยก -> ของหลุด (สมจริง ไม่ teleport)
-    ///   * รอบจ่าย (C3Payout) แรงสูง -> joint ไม่ขาด -> คีบติด
-    /// ดู docs/research-claw-mechanics.md หัวข้อ C1–C4
+    /// - ขาแต่ละข้าง = Rigidbody ห้อยจากหัวคีบด้วย HingeJoint (แกน Z) — แกว่งเบนได้
+    /// - ตอนกาง: spring ดันขาออกไปมุม openAngle แต่ "เบนหลบ" ได้เมื่อโดนของ (ดิ่งลงผ่านขอบของได้)
+    /// - ตอนหุบ: spring ขับขาเข้า closedAngle (แรง springClose) เพื่อหนีบ
+    /// - การยึดของ: FixedJoint (breakForce = แรงคีบ phase) — รอบปกติแรง < น้ำหนัก joint ขาด ของหลุด
+    /// ดู docs/research-claw-mechanics.md หัวข้อ 8 (HingeJoint approach)
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class ClawGripSystem : MonoBehaviour
     {
-        [Header("ขา 2 ข้าง (pivot)")]
-        [Tooltip("จุดหมุนของขาซ้าย/ขวา — หมุนรอบแกน Z เพื่อหุบ/กาง")]
+        [Header("การตั้งค่าตู้ (อิงตาม object — สร้างจากเมนู Claw Machine/Machine Settings)")]
+        [Tooltip("ถ้า assign ไว้ จะ override มุมกาง/แรงคีบทั้งหมดจาก asset นี้")]
+        [SerializeField] private MachineSettings settings;
+
+        [Header("ขา 2 ข้าง (มี HingeJoint)")]
+        [Tooltip("ขาซ้าย — มุม hinge เป็นบวก (มิเรอร์กับขวา)")]
         [SerializeField] private Transform leftArm;
+        [Tooltip("ขาขวา — มุม hinge เป็นลบ")]
         [SerializeField] private Transform rightArm;
 
-        [Header("องศาขา (จากแนวตั้ง)")]
-        [SerializeField] private float openAngle = 45f;
-        [SerializeField] private float closedAngle = 5f;
-        [Tooltip("ความเร็วหุบ/กาง องศา/วินาที")]
-        [SerializeField] private float armSpeed = 180f;
+        [Header("มุมขา (องศา hinge, ใช้กับทั้งสองข้างแบบมิเรอร์)")]
+        [SerializeField] private float openAngle = 35f;
+        [SerializeField] private float closedAngle = 8f;
 
-        [Header("แรงคีบ = breakForce ของ joint (newtons)")]
-        [Tooltip("C1: แรงหุบเต็มตอนล่างสุด — มากพอยึดของไว้")]
-        [SerializeField] private float forceC1 = 50f;
-        [Tooltip("C3 รอบปกติ — ต่ำกว่าน้ำหนักของ (มวล×g) เพื่อให้ joint ขาด ของหลุดตอนยก")]
+        [Header("ความแข็ง spring ของ hinge")]
+        [Tooltip("ตอนกาง — อ่อนพอให้เบนหลบของได้")]
+        [SerializeField] private float springOpen = 5f;
+        [Tooltip("ตอนหุบ — แข็งพอหนีบ (แต่ยึดจริงด้วย FixedJoint)")]
+        [SerializeField] private float springClose = 25f;
+        [SerializeField] private float springDamper = 1.5f;
+
+        [Header("แรงคีบ = breakForce ของ FixedJoint (newtons)")]
+        [SerializeField] private float forceC1 = 60f;
+        [Tooltip("รอบปกติ — ต่ำกว่าน้ำหนักของ เพื่อให้หลุดตอนยก")]
         [SerializeField] private float forceC3Normal = 2f;
-        [Tooltip("C3 รอบ payout — สูงพอคีบติด")]
-        [SerializeField] private float forceC3Payout = 50f;
-        [Tooltip("C4 ตอนเลื่อน — แรงกลาง")]
-        [SerializeField] private float forceC4 = 30f;
+        [SerializeField] private float forceC3Payout = 60f;
+        [SerializeField] private float forceC4 = 35f;
 
         [Header("Grab detection")]
-        [Tooltip("จุดกึ่งกลางระหว่างปลายขา 2 ข้าง ใช้หา prize ที่อยู่ในวงหุบ")]
+        [Tooltip("จุดกึ่งกลางระหว่างปลายขา ใช้หา prize ที่จะยึด")]
         [SerializeField] private Transform grabPoint;
-        [SerializeField] private float grabRadius = 0.07f;
+        [SerializeField] private float grabRadius = 0.09f;
         [SerializeField] private LayerMask prizeLayer = ~0;
 
         public GripPhase Phase { get; private set; } = GripPhase.Open;
         public bool IsHolding => heldPrize != null && heldJoint != null;
 
-        /// <summary>มี prize อยู่ในระยะคีบใต้หัวคีบหรือยัง (ใช้หยุดการดิ่งเมื่อ "โดนต้าน")</summary>
-        public bool PrizeInRange()
-        {
-            if (grabPoint == null) return false;
-            return Physics.CheckSphere(
-                grabPoint.position, grabRadius, prizeLayer, QueryTriggerInteraction.Ignore);
-        }
-
-        private float targetAngle;
-        private Rigidbody anchor;     // หัวคีบ kinematic ที่ joint ยึดไว้
+        private Rigidbody anchor;
+        private HingeJoint leftHinge;
+        private HingeJoint rightHinge;
         private Prize heldPrize;
         private FixedJoint heldJoint;
 
@@ -76,21 +74,46 @@ namespace ClawMachine
             anchor = GetComponent<Rigidbody>();
             anchor.isKinematic = true;
             anchor.useGravity = false;
-            anchor.interpolation = RigidbodyInterpolation.Interpolate;
 
-            targetAngle = openAngle;
-            ApplyArmAngles(openAngle);
+            if (leftArm != null) leftHinge = leftArm.GetComponent<HingeJoint>();
+            if (rightArm != null) rightHinge = rightArm.GetComponent<HingeJoint>();
+
+            // ตู้จริง: ค่าทั้งหมดมาจากแผงปรับ (MachineSettings) ไม่ฝังในโค้ด
+            if (settings != null)
+            {
+                openAngle = settings.openArmAngle;
+                forceC1 = settings.FullGripForce;
+                forceC3Normal = settings.LiftGripForce(isPayoutRound: false);
+                forceC3Payout = settings.LiftGripForce(isPayoutRound: true);
+                forceC4 = forceC1 * 0.7f;
+                // แรงสปริงหุบ สัมพันธ์กับแรงหนีบ (สปริงแรง = ขาหนีบแน่น)
+                springClose = Mathf.Max(8f, forceC1 * 0.5f);
+            }
+
+            // กันขาซ้าย-ขวาชน/เกี่ยวกันเองตอนหุบ (manual 13-4: "confirm shovels do not overlap")
+            if (leftArm != null && rightArm != null)
+            {
+                foreach (var lc in leftArm.GetComponentsInChildren<Collider>())
+                    foreach (var rc in rightArm.GetComponentsInChildren<Collider>())
+                        Physics.IgnoreCollision(lc, rc, true);
+            }
+
+            SetHinges(openAngle, springOpen);
         }
 
         private void Update()
         {
-            // อนิเมตขาเข้าหา targetAngle
-            float current = Mathf.MoveTowards(CurrentAngle(), targetAngle, armSpeed * Time.deltaTime);
-            ApplyArmAngles(current);
-
-            // joint ขาดเอง (Unity ทำลาย object) -> ถือว่าของหลุด
+            // FixedJoint ขาดเอง (Unity ทำลาย object) -> ของหลุด
             if (heldPrize != null && heldJoint == null)
                 heldPrize = null;
+        }
+
+        /// <summary>มี prize อยู่ในระยะคีบใต้หัวคีบหรือยัง</summary>
+        public bool PrizeInRange()
+        {
+            if (grabPoint == null) return false;
+            return Physics.CheckSphere(
+                grabPoint.position, grabRadius, prizeLayer, QueryTriggerInteraction.Ignore);
         }
 
         // ---------- API ที่ ClawController เรียก ----------
@@ -98,21 +121,20 @@ namespace ClawMachine
         public void OpenArms()
         {
             Phase = GripPhase.Open;
-            targetAngle = openAngle;
+            SetHinges(openAngle, springOpen);
             ReleasePrize();
         }
 
         public void CloseArms(GripPhase phase)
         {
             Phase = phase;
-            targetAngle = closedAngle;
+            SetHinges(closedAngle, springClose);
             TryGrabPrize();
         }
 
         public void SetGripPhase(GripPhase phase)
         {
             Phase = phase;
-            // ขายังหุบอยู่ระหว่าง C3/C4 — ปรับแค่ breakForce ของ joint
             if (heldJoint != null)
             {
                 float f = CurrentHoldForce();
@@ -122,6 +144,24 @@ namespace ClawMachine
         }
 
         // ---------- ภายใน ----------
+
+        // ตั้ง spring ของ hinge ทั้งสองข้างแบบมิเรอร์ (ซ้ายบวก / ขวาลบ — ทิศเดียวกับ visual เดิม)
+        private void SetHinges(float angleMagnitude, float springForce)
+        {
+            ApplyHinge(leftHinge, +angleMagnitude, springForce);
+            ApplyHinge(rightHinge, -angleMagnitude, springForce);
+        }
+
+        private void ApplyHinge(HingeJoint hinge, float target, float springForce)
+        {
+            if (hinge == null) return;
+            var s = hinge.spring;
+            s.spring = springForce;
+            s.damper = springDamper;
+            s.targetPosition = target;
+            hinge.spring = s;
+            hinge.useSpring = true;
+        }
 
         private float CurrentHoldForce()
         {
@@ -155,7 +195,6 @@ namespace ClawMachine
             if (closest != null)
             {
                 heldPrize = closest;
-                // ผูก prize ไว้กับหัวคีบที่ตำแหน่งปัจจุบัน (ไม่ snap) ด้วยแรงตาม phase
                 heldJoint = gameObject.AddComponent<FixedJoint>();
                 heldJoint.connectedBody = closest.Rigidbody;
                 heldJoint.enableCollision = false;
@@ -172,28 +211,10 @@ namespace ClawMachine
             heldPrize = null;
         }
 
-        // Unity เรียกเมื่อ joint บน GameObject นี้ขาด (แรงคีบไม่พอ)
         private void OnJointBreak(float breakForce)
         {
             heldJoint = null;
             heldPrize = null;
-        }
-
-        private float CurrentAngle()
-        {
-            if (leftArm == null) return targetAngle;
-            // อ่านองศาปัจจุบันจากขาซ้าย (รอบแกน Z)
-            return Mathf.Abs(leftArm.localEulerAngles.z > 180f
-                ? leftArm.localEulerAngles.z - 360f
-                : leftArm.localEulerAngles.z);
-        }
-
-        private void ApplyArmAngles(float angle)
-        {
-            if (leftArm != null)
-                leftArm.localRotation = Quaternion.Euler(0f, 0f, angle);
-            if (rightArm != null)
-                rightArm.localRotation = Quaternion.Euler(0f, 0f, -angle);
         }
 
         private void OnDrawGizmosSelected()
