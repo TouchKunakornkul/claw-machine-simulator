@@ -288,7 +288,7 @@ namespace ClawMachine.EditorTools
             so.FindProperty("leftArm").objectReferenceValue = leftArm;
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
-            so.FindProperty("latchRadius").floatValue = 0.05f;       // คว้าเมื่อของอยู่ในง่าม
+            so.FindProperty("holdCheckRadius").floatValue = 0.05f;   // ตรวจว่ามีของในง่าม (HUD)
             so.FindProperty("resistanceAngle").floatValue = 12f;     // ขาเบี่ยงเกินนี้ = โดนต้าน
             so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -358,13 +358,14 @@ namespace ClawMachine.EditorTools
             finger.localPosition = new Vector3(-inwardSign * 0.004f, -0.12f, 0f);
             finger.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 26f);
 
-            // ปลายแหลมงอเข้า = shovel (13-4: เลือกความกว้างตามชนิดของรางวัล W30/W40/W60)
+            // shovel = แผ่นแบนช้อนใต้ของ (13-4: W30/W40/W60 ตามชนิดของรางวัล)
+            // เอียงมากจนเกือบนอนตอนหุบ — หนีบไม่ได้ ได้แต่รอง/ตักตามฟิสิกส์จริง
             var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tip.name = name + "_Shovel_" + settings.shovel;
             tip.transform.SetParent(pivot, false);
-            tip.transform.localScale = new Vector3(0.013f, 0.03f, settings.ShovelWidthMeters);
-            tip.transform.localPosition = new Vector3(inwardSign * 0.022f, -0.16f, 0f);
-            tip.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 55f);
+            tip.transform.localScale = new Vector3(0.04f, 0.006f, settings.ShovelWidthMeters);
+            tip.transform.localPosition = new Vector3(inwardSign * 0.028f, -0.165f, 0f);
+            tip.transform.localRotation = Quaternion.Euler(0f, 0f, -inwardSign * 25f);
             Paint(tip, metal);
             var tcol = tip.GetComponent<BoxCollider>();
             if (mat != null) tcol.sharedMaterial = mat;

@@ -9,66 +9,59 @@ namespace ClawMachine
     {
         Open,        // ขากาง ไม่จับ
         C1,          // หุบแรงเต็มตอนล่างสุด
-        C3Normal,    // ยกขึ้น รอบปกติ — แรงอ่อน ของหลุด
-        C3Payout,    // ยกขึ้น รอบจ่าย — แรงเต็ม คีบติด
+        C3Normal,    // ยกขึ้น รอบปกติ — สปริงอ่อน ของดันขากางหลุดเอง
+        C3Payout,    // ยกขึ้น รอบจ่าย — สปริงแข็ง ประคองของไว้ได้
         C4Transport  // เลื่อนกลับท่อ — แรงกลาง
     }
 
     /// <summary>
-    /// ควบคุมขา 2 ข้างแบบ physics จริง (HingeJoint + spring) ตามกลไก UFO Catcher
+    /// ขา 2 ข้างแบบ physics ล้วน (HingeJoint + spring) — ไม่มีการ "ดูดติด" ใดๆ
     ///
-    /// - ขาแต่ละข้าง = Rigidbody ห้อยจากหัวคีบด้วย HingeJoint (แกน Z) — แกว่งเบนได้
-    /// - ตอนกาง: spring ดันขาออกไปมุม openAngle แต่ "เบนหลบ" ได้เมื่อโดนของ (ดิ่งลงผ่านขอบของได้)
-    /// - ตอนหุบ: spring ขับขาเข้า closedAngle (แรง springClose) เพื่อหนีบ
-    /// - การยึดของ: FixedJoint (breakForce = แรงคีบ phase) — รอบปกติแรง < น้ำหนัก joint ขาด ของหลุด
-    /// ดู docs/research-claw-mechanics.md หัวข้อ 8 (HingeJoint approach)
+    /// หลักการจริง (research + SEGA manual):
+    /// - ปลายขาเป็น shovel แผ่นแบน หนีบไม่ได้ — ได้แค่ "ช้อน/รองใต้ของ"
+    /// - ของถูกยกเพราะวางอยู่บนแผ่น shovel ด้วยแรงสัมผัส + สมดุลล้วนๆ
+    /// - "ยกแล้วหลุด" ของจริง = สปริงอ่อน → น้ำหนักของดันขากางออกเอง → ของลื่นร่วง
+    /// - แรงคีบ (POWER 00–99) = ความแข็งสปริง hinge ตอนหุบ ไม่ใช่แรงยึดวิเศษ
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class ClawGripSystem : MonoBehaviour
     {
         [Header("การตั้งค่าตู้ (อิงตาม object — สร้างจากเมนู Claw Machine/Machine Settings)")]
-        [Tooltip("ถ้า assign ไว้ จะ override มุมกาง/แรงคีบทั้งหมดจาก asset นี้")]
+        [Tooltip("ถ้า assign ไว้ จะ override มุมกาง/ความแข็งสปริงทั้งหมดจาก asset นี้")]
         [SerializeField] private MachineSettings settings;
 
         [Header("ขา 2 ข้าง (มี HingeJoint)")]
-        [Tooltip("ขาซ้าย — มุม hinge เป็นบวก (มิเรอร์กับขวา)")]
         [SerializeField] private Transform leftArm;
-        [Tooltip("ขาขวา — มุม hinge เป็นลบ")]
         [SerializeField] private Transform rightArm;
 
-        [Header("มุมขา (องศา hinge, ใช้กับทั้งสองข้างแบบมิเรอร์)")]
+        [Header("มุมขา (องศา hinge, มิเรอร์สองข้าง)")]
         [SerializeField] private float openAngle = 35f;
         [SerializeField] private float closedAngle = 8f;
 
-        [Header("ความแข็ง spring ของ hinge")]
-        [Tooltip("ตอนกาง — อ่อนพอให้เบนหลบของได้")]
+        [Header("ความแข็งสปริง hinge")]
+        [Tooltip("ตอนกาง — อ่อนพอให้เบนหลบของได้ตอนดิ่ง")]
         [SerializeField] private float springOpen = 5f;
-        [Tooltip("ตอนหุบ — แข็งพอหนีบ (แต่ยึดจริงด้วย FixedJoint)")]
-        [SerializeField] private float springClose = 25f;
+        [Tooltip("ตอนหุบแรงเต็ม (C1/payout) — มาจาก settings ถ้า assign ไว้")]
+        [SerializeField] private float springStrong = 35f;
+        [Tooltip("ตอนยกรอบปกติ (kakuritsu C3) — อ่อนจนน้ำหนักของดันขากางได้")]
+        [SerializeField] private float springWeak = 3f;
         [SerializeField] private float springDamper = 1.5f;
 
-        [Header("แรงคีบ = breakForce ของ FixedJoint (newtons)")]
-        [SerializeField] private float forceC1 = 60f;
-        [Tooltip("รอบปกติ — ต่ำกว่าน้ำหนักของ เพื่อให้หลุดตอนยก")]
-        [SerializeField] private float forceC3Normal = 2f;
-        [SerializeField] private float forceC3Payout = 60f;
-        [SerializeField] private float forceC4 = 35f;
-
-        [Header("Grab detection")]
-        [Tooltip("จุดกึ่งกลางระหว่างปลายขา ใช้หา prize ที่จะยึด")]
+        [Header("ตรวจสถานะ")]
+        [Tooltip("ระยะรอบ grabPoint ที่ถือว่า 'มีของอยู่ในง่าม' (ใช้แสดงผล/หยุดดิ่ง)")]
+        [SerializeField] private float holdCheckRadius = 0.05f;
+        [Tooltip("ขาโดนดันจนมุมเบี่ยงจากเป้าเกินนี้ = มีแรงต้านจริง (องศา)")]
+        [SerializeField] private float resistanceAngle = 12f;
         [SerializeField] private Transform grabPoint;
-        [Tooltip("ระยะคว้าหลังขาหุบเสร็จ — ของต้องอยู่ในง่ามจริงถึงจะเกาะ")]
-        [SerializeField] private float latchRadius = 0.045f;
         [SerializeField] private LayerMask prizeLayer = ~0;
 
         public GripPhase Phase { get; private set; } = GripPhase.Open;
-        public bool IsHolding => heldPrize != null && heldJoint != null;
+        /// <summary>มีของอยู่ระหว่างง่ามไหม (ตรวจทาง physics ไม่มีการยึด)</summary>
+        public bool IsHolding { get; private set; }
 
         private Rigidbody anchor;
         private HingeJoint leftHinge;
         private HingeJoint rightHinge;
-        private Prize heldPrize;
-        private FixedJoint heldJoint;
 
         private void Awake()
         {
@@ -79,19 +72,18 @@ namespace ClawMachine
             if (leftArm != null) leftHinge = leftArm.GetComponent<HingeJoint>();
             if (rightArm != null) rightHinge = rightArm.GetComponent<HingeJoint>();
 
-            // ตู้จริง: ค่าทั้งหมดมาจากแผงปรับ (MachineSettings) ไม่ฝังในโค้ด
+            // ตู้จริง: ค่าทั้งหมดมาจากแผงปรับ (MachineSettings)
             if (settings != null)
             {
                 openAngle = settings.openArmAngle;
-                forceC1 = settings.FullGripForce;
-                forceC3Normal = settings.LiftGripForce(isPayoutRound: false);
-                forceC3Payout = settings.LiftGripForce(isPayoutRound: true);
-                forceC4 = forceC1 * 0.7f;
-                // แรงสปริงหุบ สัมพันธ์กับแรงหนีบ (สปริงแรง = ขาหนีบแน่น)
-                springClose = Mathf.Max(8f, forceC1 * 0.5f);
+                springStrong = Mathf.Max(8f, settings.FullGripForce);
+                springWeak = Mathf.Max(0.5f, settings.LiftGripForce(isPayoutRound: false)
+                                              * (settings.segaMode ? 1f : settings.normalGripRatio));
+                // segaMode: แรงคงที่ทุกตา (springWeak = springStrong)
+                if (settings.segaMode) springWeak = springStrong;
             }
 
-            // กันขาซ้าย-ขวาชน/เกี่ยวกันเองตอนหุบ (manual 13-4: "confirm shovels do not overlap")
+            // กันขาซ้าย-ขวาชน/เกี่ยวกันเองตอนหุบ (manual 13-4: shovels must not overlap)
             if (leftArm != null && rightArm != null)
             {
                 foreach (var lc in leftArm.GetComponentsInChildren<Collider>())
@@ -102,31 +94,17 @@ namespace ClawMachine
             SetHinges(openAngle, springOpen);
         }
 
-        private void Update()
+        private void FixedUpdate()
         {
-            // FixedJoint ขาดเอง (Unity ทำลาย object) -> ของหลุด
-            if (heldPrize != null && heldJoint == null)
-                heldPrize = null;
+            // สถานะ "มีของในง่าม" — เช็คทาง physics ล้วน ไว้โชว์ HUD
+            IsHolding = Phase != GripPhase.Open && PrizeBetweenArms();
         }
 
-        [Header("ตรวจแรงต้าน (ใช้หยุดการดิ่ง)")]
-        [Tooltip("ขาโดนดันจนมุมเบี่ยงจากมุมพักเกินนี้ = มีแรงต้านจริง (องศา)")]
-        [SerializeField] private float resistanceAngle = 12f;
-
-        /// <summary>
-        /// มีแรงต้านจริงส่งขึ้นมาที่ขาหรือยัง — ขาโดนของดันจนมุม hinge เบี่ยงจากเป้า spring
-        /// เกิน resistanceAngle (เฉียดขอบ = เบี่ยงนิดเดียว ดิ่งต่อ/ลื่นผ่านได้)
-        /// </summary>
+        /// <summary>ขาโดนของดันจนเบี่ยงเกิน threshold = แรงต้านจริง (ใช้หยุดการดิ่ง)</summary>
         public bool ArmsResisted()
         {
             return HingeDeviation(leftHinge) > resistanceAngle
                 || HingeDeviation(rightHinge) > resistanceAngle;
-        }
-
-        private static float HingeDeviation(HingeJoint h)
-        {
-            if (h == null) return 0f;
-            return Mathf.Abs(h.angle - h.spring.targetPosition);
         }
 
         // ---------- API ที่ ClawController เรียก ----------
@@ -135,40 +113,44 @@ namespace ClawMachine
         {
             Phase = GripPhase.Open;
             SetHinges(openAngle, springOpen);
-            ReleasePrize();
         }
 
-        /// <summary>สั่งหุบขา (ยังไม่คว้า — joint จะเกิดตอน TryLatch หลังขาหุบเสร็จ)</summary>
+        /// <summary>หุบขาด้วยสปริงแรงเต็ม — shovel ช้อนเข้าใต้ของตามฟิสิกส์จริง ไม่มีการยึด</summary>
         public void CloseArms(GripPhase phase)
         {
             Phase = phase;
-            SetHinges(closedAngle, springClose);
+            SetHinges(closedAngle, springStrong);
         }
 
         /// <summary>
-        /// เรียกหลังขาหุบเสร็จ (จบ C2 hold): ถ้ามีของอยู่ในง่ามจริงค่อยเกาะ
-        /// ถ้าไม่มี = คว้าลม (ขาอาจแค่ดัน/เขี่ยของ — สมจริงแบบ tatehame)
+        /// เปลี่ยนระดับแรง (C3/C4): ปรับแค่ความแข็งสปริงขณะขายังหุบ
+        /// รอบอ่อน: น้ำหนักของจะดันขากางออกเอง → ของลื่นร่วง (ไม่มี joint ให้ขาด)
         /// </summary>
-        public bool TryLatch()
-        {
-            TryGrabPrize();
-            return IsHolding;
-        }
-
         public void SetGripPhase(GripPhase phase)
         {
             Phase = phase;
-            if (heldJoint != null)
-            {
-                float f = CurrentHoldForce();
-                heldJoint.breakForce = f;
-                heldJoint.breakTorque = f;
-            }
+            float spring =
+                phase == GripPhase.C3Normal ? springWeak :
+                phase == GripPhase.C4Transport ? Mathf.Lerp(springWeak, springStrong, 0.7f) :
+                springStrong;
+            SetHinges(closedAngle, spring);
         }
 
         // ---------- ภายใน ----------
 
-        // ตั้ง spring ของ hinge ทั้งสองข้างแบบมิเรอร์ (ซ้ายบวก / ขวาลบ — ทิศเดียวกับ visual เดิม)
+        private bool PrizeBetweenArms()
+        {
+            if (grabPoint == null) return false;
+            return Physics.CheckSphere(
+                grabPoint.position, holdCheckRadius, prizeLayer, QueryTriggerInteraction.Ignore);
+        }
+
+        private static float HingeDeviation(HingeJoint h)
+        {
+            if (h == null) return 0f;
+            return Mathf.Abs(h.angle - h.spring.targetPosition);
+        }
+
         private void SetHinges(float angleMagnitude, float springForce)
         {
             ApplyHinge(leftHinge, +angleMagnitude, springForce);
@@ -186,66 +168,12 @@ namespace ClawMachine
             hinge.useSpring = true;
         }
 
-        private float CurrentHoldForce()
-        {
-            switch (Phase)
-            {
-                case GripPhase.C1:          return forceC1;
-                case GripPhase.C3Normal:    return forceC3Normal;
-                case GripPhase.C3Payout:    return forceC3Payout;
-                case GripPhase.C4Transport: return forceC4;
-                default:                    return 0f;
-            }
-        }
-
-        private void TryGrabPrize()
-        {
-            if (heldJoint != null || grabPoint == null) return;
-
-            Collider[] hits = Physics.OverlapSphere(
-                grabPoint.position, latchRadius, prizeLayer, QueryTriggerInteraction.Ignore);
-
-            Prize closest = null;
-            float best = float.MaxValue;
-            foreach (var col in hits)
-            {
-                var prize = col.GetComponentInParent<Prize>();
-                if (prize == null) continue;
-                float d = (prize.transform.position - grabPoint.position).sqrMagnitude;
-                if (d < best) { best = d; closest = prize; }
-            }
-
-            if (closest != null)
-            {
-                heldPrize = closest;
-                heldJoint = gameObject.AddComponent<FixedJoint>();
-                heldJoint.connectedBody = closest.Rigidbody;
-                heldJoint.enableCollision = false;
-                float f = CurrentHoldForce();
-                heldJoint.breakForce = f;
-                heldJoint.breakTorque = f;
-            }
-        }
-
-        private void ReleasePrize()
-        {
-            if (heldJoint != null) Destroy(heldJoint);
-            heldJoint = null;
-            heldPrize = null;
-        }
-
-        private void OnJointBreak(float breakForce)
-        {
-            heldJoint = null;
-            heldPrize = null;
-        }
-
         private void OnDrawGizmosSelected()
         {
             if (grabPoint != null)
             {
                 Gizmos.color = Color.yellow;
-                Gizmos.DrawWireSphere(grabPoint.position, latchRadius);
+                Gizmos.DrawWireSphere(grabPoint.position, holdCheckRadius);
             }
         }
     }

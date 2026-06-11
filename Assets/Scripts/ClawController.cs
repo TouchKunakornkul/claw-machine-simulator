@@ -171,8 +171,7 @@ namespace ClawMachine
             stateTimer += Time.deltaTime;
             if (stateTimer >= holdDuration)
             {
-                // ขาหุบเสร็จแล้ว ค่อยดูว่าของอยู่ในง่ามจริงไหม (ไม่ใช่ดูดจากระยะไกล)
-                gripSystem.TryLatch();
+                // ไม่มีการยึดใดๆ — ของจะติดขึ้นไปก็ต่อเมื่อ shovel ช้อนรับไว้ได้จริง
                 EnterLifting();
             }
         }
