@@ -58,6 +58,14 @@ namespace ClawMachine
         public GripPhase Phase { get; private set; } = GripPhase.Open;
         public bool IsHolding => heldPrize != null && heldJoint != null;
 
+        /// <summary>มี prize อยู่ในระยะคีบใต้หัวคีบหรือยัง (ใช้หยุดการดิ่งเมื่อ "โดนต้าน")</summary>
+        public bool PrizeInRange()
+        {
+            if (grabPoint == null) return false;
+            return Physics.CheckSphere(
+                grabPoint.position, grabRadius, prizeLayer, QueryTriggerInteraction.Ignore);
+        }
+
         private float targetAngle;
         private Rigidbody anchor;     // หัวคีบ kinematic ที่ joint ยึดไว้
         private Prize heldPrize;

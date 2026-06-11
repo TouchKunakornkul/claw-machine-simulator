@@ -123,9 +123,17 @@ namespace ClawMachine
 
         private void TickDropping()
         {
+            // โดนต้าน = มีของเข้ามาในระยะคีบ -> หยุดทันที (ไม่ดันของลงต่อ)
+            if (gripSystem.PrizeInRange())
+            {
+                EnterGripping();
+                return;
+            }
+
             Vector3 p = clawHead.localPosition;
             p.y -= descentSpeed * Time.deltaTime;
 
+            // กันเผื่อด้วย raycast (กรณีของบางเฉียดขอบ sphere) + ชนพื้น
             bool hitBottom = p.y <= yBottom;
             Vector3 probeOrigin = dropProbe != null ? dropProbe.position : clawHead.position;
             bool hitObject = Physics.Raycast(

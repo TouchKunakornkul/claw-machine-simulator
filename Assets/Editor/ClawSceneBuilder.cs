@@ -288,37 +288,51 @@ namespace ClawMachine.EditorTools
             return (claw, grip);
         }
 
+        // ง่ามคีบ = นิ้วโค้ง 2 ท่อน (capsule) + ปลายแหลมงอเข้า แบบ UFO catcher จริง
         private static Transform BuildArm(string name, Transform parent, PhysicsMaterial mat, float inwardSign)
         {
-            var metal = new Color(0.78f, 0.78f, 0.82f);
+            var metal = new Color(0.82f, 0.82f, 0.87f);
 
             // pivot ที่แกนกลางหัวคีบ — หมุนรอบ Z เพื่อหุบ/กาง
             var pivot = new GameObject(name).transform;
             pivot.SetParent(parent, false);
-            pivot.localPosition = new Vector3(0f, -0.035f, 0f);
+            pivot.localPosition = new Vector3(0f, -0.03f, 0f);
 
-            // ท่อนบน: แท่งยาวยื่นลง
-            var upper = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            upper.name = name + "_Upper";
-            upper.transform.SetParent(pivot, false);
-            upper.transform.localScale = new Vector3(0.018f, 0.11f, 0.022f);
-            upper.transform.localPosition = new Vector3(0f, -0.055f, 0f);
-            Paint(upper, metal);
-            var ucol = upper.GetComponent<BoxCollider>();
-            if (mat != null) ucol.sharedMaterial = mat;
+            // ท่อนบน (shoulder): ยื่นลงบานออกเล็กน้อย
+            var shoulder = MakeCapsule(name + "_Shoulder", pivot, mat, metal);
+            shoulder.localScale = new Vector3(0.02f, 0.04f, 0.02f);
+            shoulder.localPosition = new Vector3(-inwardSign * 0.012f, -0.05f, 0f);
+            shoulder.localRotation = Quaternion.Euler(0f, 0f, -inwardSign * 14f);
 
-            // ปลายงอเข้า (hook tip): เอียงเข้าหากึ่งกลาง
+            // ท่อนล่าง (finger): โค้งเข้าหากึ่งกลางเป็นตะขอ
+            var finger = MakeCapsule(name + "_Finger", pivot, mat, metal);
+            finger.localScale = new Vector3(0.017f, 0.045f, 0.017f);
+            finger.localPosition = new Vector3(-inwardSign * 0.004f, -0.12f, 0f);
+            finger.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 26f);
+
+            // ปลายแหลมงอเข้า (จุดเกี่ยวของรางวัล)
             var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tip.name = name + "_Tip";
             tip.transform.SetParent(pivot, false);
-            tip.transform.localScale = new Vector3(0.018f, 0.055f, 0.022f);
-            tip.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 38f);
-            tip.transform.localPosition = new Vector3(inwardSign * 0.013f, -0.125f, 0f);
+            tip.transform.localScale = new Vector3(0.013f, 0.03f, 0.013f);
+            tip.transform.localPosition = new Vector3(inwardSign * 0.022f, -0.16f, 0f);
+            tip.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 55f);
             Paint(tip, metal);
             var tcol = tip.GetComponent<BoxCollider>();
             if (mat != null) tcol.sharedMaterial = mat;
 
             return pivot;
+        }
+
+        private static Transform MakeCapsule(string name, Transform parent, PhysicsMaterial mat, Color c)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            Paint(go, c);
+            var col = go.GetComponent<CapsuleCollider>();
+            if (mat != null && col != null) col.sharedMaterial = mat;
+            return go.transform;
         }
 
         private static PayoutManager BuildSystems()
