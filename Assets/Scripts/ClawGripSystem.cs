@@ -16,11 +16,16 @@ namespace ClawMachine
 
     /// <summary>
     /// ควบคุมการหุบ/กางขา 2 ขา และ "แรงยึด" ของรางวัล
-    /// จำลองหัวใจของตู้คีบ: แรงตอนยก (C3) ต่างกันระหว่างรอบปกติกับรอบ payout
-    /// แรงยึดจำลองผ่านการดูว่า น้ำหนักของ × gravity เกิน gripHoldForce ปัจจุบันหรือไม่
-    /// ถ้าเกิน -> ของลื่นหลุดจากขา (คลาย parent / ลดแรงเสียดทานเสมือน)
+    ///
+    /// โมเดลฟิสิกส์ (อ้างอิง implementation จริงของ czazuaga/Claw_Machine_Simulator + งานวิจัย):
+    /// - ของรางวัลเป็น Rigidbody dynamic ตลอด (วางบนคานได้ ขาดันได้จริง)
+    /// - ตอนหุบขา (C1) ถ้ามี prize อยู่ในวงคีบ จะผูก FixedJoint กับหัวคีบ (kinematic anchor)
+    /// - breakForce ของ joint = แรงคีบ phase ปัจจุบัน
+    ///   * รอบปกติ (C3Normal) แรงต่ำกว่าน้ำหนักของ -> joint ขาดตอนยก -> ของหลุด (สมจริง ไม่ teleport)
+    ///   * รอบจ่าย (C3Payout) แรงสูง -> joint ไม่ขาด -> คีบติด
     /// ดู docs/research-claw-mechanics.md หัวข้อ C1–C4
     /// </summary>
+    [RequireComponent(typeof(Rigidbody))]
     public class ClawGripSystem : MonoBehaviour
     {
         [Header("ขา 2 ข้าง (pivot)")]
@@ -34,33 +39,37 @@ namespace ClawMachine
         [Tooltip("ความเร็วหุบ/กาง องศา/วินาที")]
         [SerializeField] private float armSpeed = 180f;
 
-        [Header("แรงยึด (newtons เสมือน) ต่อแต่ละ phase")]
-        [Tooltip("C1: แรงหุบเต็ม — พอยกของหนักสุดที่ออกแบบ")]
-        [SerializeField] private float forceC1 = 8f;
-        [Tooltip("C3 รอบปกติ — 15% ของ C1 ทำให้ของ >~0.1kg หลุด")]
-        [SerializeField] private float forceC3Normal = 1.2f;
-        [Tooltip("C3 รอบ payout — เท่า C1")]
-        [SerializeField] private float forceC3Payout = 8f;
+        [Header("แรงคีบ = breakForce ของ joint (newtons)")]
+        [Tooltip("C1: แรงหุบเต็มตอนล่างสุด — มากพอยึดของไว้")]
+        [SerializeField] private float forceC1 = 50f;
+        [Tooltip("C3 รอบปกติ — ต่ำกว่าน้ำหนักของ (มวล×g) เพื่อให้ joint ขาด ของหลุดตอนยก")]
+        [SerializeField] private float forceC3Normal = 2f;
+        [Tooltip("C3 รอบ payout — สูงพอคีบติด")]
+        [SerializeField] private float forceC3Payout = 50f;
         [Tooltip("C4 ตอนเลื่อน — แรงกลาง")]
-        [SerializeField] private float forceC4 = 6f;
+        [SerializeField] private float forceC4 = 30f;
 
         [Header("Grab detection")]
         [Tooltip("จุดกึ่งกลางระหว่างปลายขา 2 ข้าง ใช้หา prize ที่อยู่ในวงหุบ")]
         [SerializeField] private Transform grabPoint;
-        [SerializeField] private float grabRadius = 0.06f;
+        [SerializeField] private float grabRadius = 0.07f;
         [SerializeField] private LayerMask prizeLayer = ~0;
 
         public GripPhase Phase { get; private set; } = GripPhase.Open;
-        public bool IsHolding => heldPrize != null;
+        public bool IsHolding => heldPrize != null && heldJoint != null;
 
         private float targetAngle;
+        private Rigidbody anchor;     // หัวคีบ kinematic ที่ joint ยึดไว้
         private Prize heldPrize;
-        // joint เสมือน: ตำแหน่ง offset ของ prize เทียบ grabPoint ตอนเริ่มจับ
-        private Vector3 heldLocalOffset;
-        private Quaternion heldLocalRotation;
+        private FixedJoint heldJoint;
 
         private void Awake()
         {
+            anchor = GetComponent<Rigidbody>();
+            anchor.isKinematic = true;
+            anchor.useGravity = false;
+            anchor.interpolation = RigidbodyInterpolation.Interpolate;
+
             targetAngle = openAngle;
             ApplyArmAngles(openAngle);
         }
@@ -70,25 +79,10 @@ namespace ClawMachine
             // อนิเมตขาเข้าหา targetAngle
             float current = Mathf.MoveTowards(CurrentAngle(), targetAngle, armSpeed * Time.deltaTime);
             ApplyArmAngles(current);
-        }
 
-        private void FixedUpdate()
-        {
-            if (heldPrize == null) return;
-
-            float hold = CurrentHoldForce();
-            float weight = heldPrize.Rigidbody.mass * Mathf.Abs(Physics.gravity.y);
-
-            if (weight > hold)
-            {
-                // แรงยึดไม่พอ -> ของลื่นหลุด (ปล่อยให้ physics เล่นต่อ)
-                ReleasePrize();
-            }
-            else
-            {
-                // ยึดของไว้กับ grabPoint แบบ kinematic follow (จำลองการคีบติด)
-                KeepPrizeAttached();
-            }
+            // joint ขาดเอง (Unity ทำลาย object) -> ถือว่าของหลุด
+            if (heldPrize != null && heldJoint == null)
+                heldPrize = null;
         }
 
         // ---------- API ที่ ClawController เรียก ----------
@@ -110,7 +104,13 @@ namespace ClawMachine
         public void SetGripPhase(GripPhase phase)
         {
             Phase = phase;
-            // ขายังหุบอยู่ระหว่าง C3/C4 — เปลี่ยนแค่ระดับแรงยึด
+            // ขายังหุบอยู่ระหว่าง C3/C4 — ปรับแค่ breakForce ของ joint
+            if (heldJoint != null)
+            {
+                float f = CurrentHoldForce();
+                heldJoint.breakForce = f;
+                heldJoint.breakTorque = f;
+            }
         }
 
         // ---------- ภายใน ----------
@@ -129,7 +129,7 @@ namespace ClawMachine
 
         private void TryGrabPrize()
         {
-            if (heldPrize != null || grabPoint == null) return;
+            if (heldJoint != null || grabPoint == null) return;
 
             Collider[] hits = Physics.OverlapSphere(
                 grabPoint.position, grabRadius, prizeLayer, QueryTriggerInteraction.Ignore);
@@ -147,22 +147,27 @@ namespace ClawMachine
             if (closest != null)
             {
                 heldPrize = closest;
-                heldPrize.Rigidbody.isKinematic = true;
-                heldLocalOffset = grabPoint.InverseTransformPoint(heldPrize.transform.position);
-                heldLocalRotation = Quaternion.Inverse(grabPoint.rotation) * heldPrize.transform.rotation;
+                // ผูก prize ไว้กับหัวคีบที่ตำแหน่งปัจจุบัน (ไม่ snap) ด้วยแรงตาม phase
+                heldJoint = gameObject.AddComponent<FixedJoint>();
+                heldJoint.connectedBody = closest.Rigidbody;
+                heldJoint.enableCollision = false;
+                float f = CurrentHoldForce();
+                heldJoint.breakForce = f;
+                heldJoint.breakTorque = f;
             }
-        }
-
-        private void KeepPrizeAttached()
-        {
-            heldPrize.transform.position = grabPoint.TransformPoint(heldLocalOffset);
-            heldPrize.transform.rotation = grabPoint.rotation * heldLocalRotation;
         }
 
         private void ReleasePrize()
         {
-            if (heldPrize == null) return;
-            heldPrize.Rigidbody.isKinematic = false;
+            if (heldJoint != null) Destroy(heldJoint);
+            heldJoint = null;
+            heldPrize = null;
+        }
+
+        // Unity เรียกเมื่อ joint บน GameObject นี้ขาด (แรงคีบไม่พอ)
+        private void OnJointBreak(float breakForce)
+        {
+            heldJoint = null;
             heldPrize = null;
         }
 

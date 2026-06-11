@@ -174,12 +174,13 @@ namespace ClawMachine.EditorTools
             return mm;
         }
 
-        // ===== Hashi-watashi (橋渡し) =====
+        // ===== Hashi-watashi (橋渡し) — สเกลจริงหน่วยเมตร =====
         // คาน 2 อันวางขนานตามแกน X เว้นช่องตรงกลางตามแกน Z
-        private const float BarZ = 0.07f;       // ตำแหน่ง z ของคานแต่ละอัน (±)
-        private const float BarThick = 0.04f;   // ความหนาคาน
+        // อ้างอิง: ช่องเล่นจริง ~50cm, คานเหล็กกลม ~2cm, กล่อง figure ~16cm
+        private const float BarZ = 0.06f;       // ตำแหน่ง z ของคานแต่ละอัน (±)
+        private const float BarThick = 0.02f;   // ความหนาคาน 2cm (จากเดิม 4cm)
         private const float BarTopY = 0.16f;    // ผิวบนคาน
-        private const float GapHalfZ = 0.05f;   // ครึ่งความกว้างช่อง (ขอบในคาน)
+        private const float GapHalfZ = BarZ - BarThick / 2f; // ขอบในคาน = ครึ่งช่อง (0.05 -> ช่อง 10cm)
 
         private static void BuildBars(PhysicsMaterial mat)
         {
@@ -271,7 +272,7 @@ namespace ClawMachine.EditorTools
             // ขาดิ่ง: ยิง ray จาก GrabPoint หา prize เท่านั้น (กัน ray ชนขาตัวเอง)
             var cso = new SerializedObject(claw);
             cso.FindProperty("dropProbe").objectReferenceValue = grabPoint;
-            cso.FindProperty("groundCheckDistance").floatValue = 0.04f;
+            cso.FindProperty("groundCheckDistance").floatValue = 0.025f;
             cso.FindProperty("dropBlockingLayers").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             cso.ApplyModifiedPropertiesWithoutUndo();
 
@@ -280,6 +281,7 @@ namespace ClawMachine.EditorTools
             so.FindProperty("leftArm").objectReferenceValue = leftArm;
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
+            so.FindProperty("grabRadius").floatValue = 0.09f; // ครอบกล่อง figure ที่ใหญ่ขึ้น
             so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -352,15 +354,17 @@ namespace ClawMachine.EditorTools
         private static void SpawnBoxesOnBars(PhysicsMaterial mat, int layer)
         {
             var root = new GameObject("Figures").transform;
-            var boxSize = new Vector3(0.07f, 0.06f, 0.14f);
+            // กล่อง figure จริง ~16cm: ยาว Z=16cm (พาดคาน) / แคบ X=8cm < ช่อง 10cm / สูง 7cm
+            var boxSize = new Vector3(0.08f, 0.07f, 0.16f);
             float restY = BarTopY + boxSize.y / 2f + 0.001f;
 
             // (x, มุมหมุนรอบ Y) — ไล่ความยากจากตั้งฉาก(ยาก) ไปเกือบขนาน(ง่าย ใกล้ร่วง)
+            // มุมที่ extent ใน Z = ช่อง 10cm อยู่ราว 82° (เกินกว่านั้นร่วงเอง)
             var setups = new[]
             {
-                new Vector2(-0.14f, 0f),   // ตั้งฉากคาน — ยาก
-                new Vector2(0.00f, 38f),   // เฉียง — ปานกลาง
-                new Vector2(0.15f, 66f),   // เกือบขนาน — ง่าย ดันนิดเดียวร่วง
+                new Vector2(-0.15f, 0f),   // ตั้งฉากคาน — ยาก
+                new Vector2(0.00f, 45f),   // เฉียง — ปานกลาง
+                new Vector2(0.16f, 78f),   // เกือบขนาน — ง่าย ดันนิดเดียวร่วง
             };
 
             for (int i = 0; i < setups.Length; i++)
