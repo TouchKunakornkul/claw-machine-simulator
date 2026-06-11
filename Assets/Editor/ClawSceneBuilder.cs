@@ -19,6 +19,9 @@ namespace ClawMachine.EditorTools
         private const string PhysMatPath = "Assets/Physics/LowFriction.physicMaterial";
         private const string PrizeLayerName = "Prize";
 
+        // มุมหน้า-ซ้ายของตู้ = จุดพัก/เริ่มของตัวหนีบ + ช่องรับของ (front = -Z ฝั่งกล้อง)
+        private static readonly Vector2 HomeCorner = new Vector2(-0.18f, -0.18f);
+
         [MenuItem("Claw Machine/Build MVP Scene")]
         public static void BuildScene()
         {
@@ -172,14 +175,24 @@ namespace ClawMachine.EditorTools
 
         private static PrizeCatchZone BuildChute()
         {
-            // ท่อรับของมุมหลัง-ขวา
+            // ช่องรับของที่มุมหน้า (จุดเดียวกับที่ตัวหนีบพัก)
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = "Chute";
-            Object.DestroyImmediate(go.GetComponent<MeshRenderer>()); // มองไม่เห็น
-            go.transform.position = new Vector3(0.18f, 0.08f, 0.18f);
-            go.transform.localScale = new Vector3(0.12f, 0.16f, 0.12f);
+            Object.DestroyImmediate(go.GetComponent<MeshRenderer>()); // trigger มองไม่เห็น
+            go.transform.position = new Vector3(HomeCorner.x, 0.08f, HomeCorner.y);
+            go.transform.localScale = new Vector3(0.14f, 0.16f, 0.14f);
             var col = go.GetComponent<BoxCollider>();
             col.isTrigger = true;
+
+            // marker พื้นสีเข้มให้เห็นว่าเป็นช่องรับของ
+            var hole = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            hole.name = "ChuteHoleMarker";
+            hole.transform.SetParent(go.transform, false);
+            hole.transform.localScale = new Vector3(1f, 0.06f, 1f);
+            hole.transform.localPosition = new Vector3(0f, -0.49f, 0f); // ที่พื้นตู้
+            Object.DestroyImmediate(hole.GetComponent<Collider>());
+            Paint(hole, new Color(0.05f, 0.05f, 0.06f));
+
             return go.AddComponent<PrizeCatchZone>();
         }
 
@@ -189,7 +202,8 @@ namespace ClawMachine.EditorTools
 
             var gantry = new GameObject("Gantry").transform;
             gantry.SetParent(machine, false);
-            gantry.localPosition = new Vector3(0f, 0.55f, 0f);
+            // เริ่มที่มุมหน้า-ซ้าย (จุดพักเหนือช่องรับของ) เหมือนตู้คีบจริง
+            gantry.localPosition = new Vector3(HomeCorner.x, 0.55f, HomeCorner.y);
             var claw = gantry.gameObject.AddComponent<ClawController>();
 
             var clawHead = new GameObject("ClawHead").transform;
@@ -351,7 +365,7 @@ namespace ClawMachine.EditorTools
             so.FindProperty("clawHead").objectReferenceValue = grip.transform; // ClawHead = ที่ติด grip
             so.FindProperty("gripSystem").objectReferenceValue = grip;
             so.FindProperty("payoutManager").objectReferenceValue = payout;
-            so.FindProperty("chuteHome").vector2Value = new Vector2(0.18f, 0.18f);
+            so.FindProperty("chuteHome").vector2Value = HomeCorner;
             so.FindProperty("yTop").floatValue = 0f;
             so.FindProperty("yBottom").floatValue = -0.45f;
             so.FindProperty("xLimits").vector2Value = new Vector2(-0.22f, 0.22f);
