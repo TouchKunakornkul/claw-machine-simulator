@@ -17,11 +17,11 @@ MonoBehaviour:
   armSize: 2
   shovel: 1
   shovelGapCm: 0.1
-  openArmAngle: 70
+  openArmAngle: 80
   clawYaw: 0
   armOffsetCm: 1.6
   segaMode: 1
   payoutEveryN: 12
   normalGripRatio: 0.15
-  minGripForce: 1
-  maxGripForce: 60
+  minGripForce: 0.3
+  maxGripForce: 12

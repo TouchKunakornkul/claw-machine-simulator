@@ -180,21 +180,22 @@ namespace ClawMachine.EditorTools
         }
 
         // ===== Hashi-watashi (橋渡し) — สเกลจริงหน่วยเมตร =====
-        // คานท่อกลม 2 อัน (Ø3cm หุ้มยาง) พาดชนผนังตามแกน X เหมือน "สะพานข้ามหลุม"
-        // ใต้คานทั้งหมดคือหลุมรับของ — กล่องร่วงจากคานตรงไหนก็ได้ = ได้รางวัล
-        // อ้างอิง: กล่อง figure จริง ~20cm เกยคานข้างละ ~1cm
-        private const float BarZ = 0.075f;      // ตำแหน่ง z กึ่งกลางคานแต่ละอัน (±)
+        // ตู้ figure จริงส่วนใหญ่ใช้ "คาน 4 อัน": กล่องพาดคู่กลาง (สวม pink tube หนึบ)
+        // หย่อนผ่านช่องกลาง = ได้รางวัล / คู่นอกเป็นราวเปล่า ลื่นกว่า
+        // ระยะกลาง->นอก (13.5cm) < กล่อง 20cm -> กล่องโดนดันจะค้างพาดกลาง-นอกได้
+        // (จังหวะ "เกือบได้" แบบตู้จริง) — ใต้คานทั้งหมดคือหลุม ร่วงตรงไหนก็ได้รางวัล
+        private const float BarZ = 0.075f;      // คู่กลาง: z กึ่งกลางคาน (±)
+        private const float OuterBarZ = 0.21f;  // คู่นอก: z กึ่งกลางคาน (±)
         private const float BarDia = 0.025f;    // เส้นผ่านศูนย์กลางคาน 2.5cm
-        private const float BarTopY = 0.16f;    // ผิวบนคาน
-        private const float GapHalfZ = BarZ - BarDia / 2f; // ขอบในคาน (ช่องใน 12cm)
+        private const float BarTopY = 0.30f;    // ผิวบนคาน — ยกสูงให้เห็นกล่องร่วงเต็มตา
+        private const float GapHalfZ = BarZ - BarDia / 2f; // ขอบในคู่กลาง (ช่องใน 12cm)
 
         private static void BuildBars(PhysicsMaterial mat)
         {
             var root = new GameObject("Bars").transform;
             float cy = BarTopY - BarDia / 2f;
-            var barColor = new Color(0.85f, 0.2f, 0.2f); // คานสีแดงเด่น
 
-            // คานจริงคลุมสายยาง/ท่อยาง = หนึบพอประมาณ — frictionCombine Maximum
+            // pink tube จริง: ยางหนึบสวมเฉพาะคู่กลางที่รับกล่อง — frictionCombine Maximum
             // เพื่อชนะ Minimum ของกล่อง (กล่องลื่นบน shovel แต่หนึบบนคาน)
             var rubber = new PhysicsMaterial("BarRubber")
             {
@@ -206,13 +207,18 @@ namespace ClawMachine.EditorTools
             };
             AssetDatabase.CreateAsset(rubber, "Assets/Physics/BarRubber.physicMaterial");
 
-            MakeBar(root, "Bar_Front", new Vector3(0f, cy, -BarZ), rubber, barColor);
-            MakeBar(root, "Bar_Back", new Vector3(0f, cy, BarZ), rubber, barColor);
+            var pink = new Color(0.95f, 0.45f, 0.65f);   // pink tube
+            var chrome = new Color(0.75f, 0.75f, 0.78f); // ราวโลหะเปล่า
+
+            MakeBar(root, "Bar_Mid_Front", new Vector3(0f, cy, -BarZ), rubber, pink);
+            MakeBar(root, "Bar_Mid_Back", new Vector3(0f, cy, BarZ), rubber, pink);
+            MakeBar(root, "Bar_Outer_Front", new Vector3(0f, cy, -OuterBarZ), null, chrome);
+            MakeBar(root, "Bar_Outer_Back", new Vector3(0f, cy, OuterBarZ), null, chrome);
         }
 
         // คานกลม: cylinder นอนตามแกน X ยาวชนผนังสองข้าง
         private static void MakeBar(Transform parent, string name, Vector3 pos,
-            PhysicsMaterial rubber, Color c)
+            PhysicsMaterial barMat, Color c)
         {
             var bar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             bar.name = name;
@@ -221,7 +227,7 @@ namespace ClawMachine.EditorTools
             bar.transform.localScale = new Vector3(BarDia, FieldHalfX, BarDia); // cylinder สูง 2 หน่วย -> ยาวชนผนัง
             bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);  // นอนตามแกน X
             Paint(bar, c);
-            bar.GetComponent<Collider>().sharedMaterial = rubber;
+            if (barMat != null) bar.GetComponent<Collider>().sharedMaterial = barMat;
         }
 
         // จุดได้ของ = ใต้ตู้ทั้งหมด (คานเป็นสะพานข้ามหลุม — ร่วงตรงไหนก็ได้รางวัล)
@@ -434,7 +440,7 @@ namespace ClawMachine.EditorTools
         {
             var go = new GameObject(name);
             go.transform.position = pos;
-            go.transform.LookAt(new Vector3(0f, 0.22f, 0f));
+            go.transform.LookAt(new Vector3(0f, 0.30f, 0f));
             var cam = go.AddComponent<Camera>();
             cam.enabled = enabled;
             cam.backgroundColor = new Color(0.05f, 0.05f, 0.08f);
