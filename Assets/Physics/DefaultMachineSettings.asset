@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ClawMachine.MachineSettings
   power: 55
   springStage: 1
-  armSize: 1
+  armSize: 2
   shovel: 1
   shovelGapCm: 0.5
-  openArmAngle: 55
+  openArmAngle: 70
   clawYaw: 0
   armOffsetCm: 1.6
   segaMode: 1

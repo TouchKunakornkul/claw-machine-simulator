@@ -37,8 +37,9 @@ namespace ClawMachine
         public ShovelType shovel = ShovelType.W40;
 
         // ===== 13-4: สกรูปรับระยะห่าง shovel ตอนหุบ (overlap adjustment screw) =====
-        [Header("ระยะห่างปลาย shovel ตอนหุบ (cm) — manual: ต้องไม่ overlap")]
-        [Range(0f, 3f)] public float shovelGapCm = 0.5f;
+        // สเปคจริงจาก exploded view (26): ระยะปลายตอนหุบ = 1±1 mm (เกือบแตะ ห้ามทับ)
+        [Header("ระยะห่างปลาย shovel ตอนหุบ (cm) — สเปคโรงงาน 0.1")]
+        [Range(0f, 3f)] public float shovelGapCm = 0.1f;
 
         // ===== 13-5: มุมกางขา (เลื่อน sensor bracket ด้าน A = กว้าง / B = แคบ) =====
         // ขาตัว L ท่อนนอนยาว: เครื่องจริงตอนกางขาบานมาก (~70° จากแนวดิ่ง)

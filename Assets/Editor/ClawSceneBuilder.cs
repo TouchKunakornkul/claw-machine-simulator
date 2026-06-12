@@ -324,7 +324,7 @@ namespace ClawMachine.EditorTools
             s.armSize = MachineSettings.ArmSize.L; // กล่อง figure 20cm ร้านจริงใช้ขา L
             s.shovel = MachineSettings.ShovelType.W40;
             s.openArmAngle = 70f; // ขาตัว L ท่อนนอนยาว ต้องกางมากถึงคร่อมกล่อง 10cm
-            s.shovelGapCm = 0.5f; // 13-4: ปลายเกือบแตะ ไม่ overlap
+            s.shovelGapCm = 0.1f; // สเปคจริงจาก exploded view: 1±1 mm
             s.clawYaw = 0f;       // กางขนานคาน (ปรับทแยงได้ในแผง Tab)
             s.armOffsetCm = 1.6f; // ขาขนานแต่เยื้องกัน — shovel สวนผ่านกันได้ตอนหุบ
             s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
