@@ -231,9 +231,9 @@ namespace ClawMachine
             ReapplyPhase();
         }
 
-        [Tooltip("มุมแอ่นรับของแผ่น shovel เทียบท่อนนอน (องศา) — ของจริง = หน้าแปลนกด -15° " +
-                 "+ รอยพับเชิด +20~25° สุทธิราว +5~12°; ค่าสูง = หน้าแผ่นตั้งขึ้น ดัน/สกิดกล่องได้เต็มแรง")]
-        [SerializeField] private float shovelScoopTilt = 12f;
+        [Tooltip("มุม V ของหน้า shovel ตอนหุบ (องศาจากแนวนอน) — วัดจากรูปท่าหุบใน manual ≈ 6°\n" +
+                 "(รอยพับ shovel จริงหักมุมชดเชยจนหน้าช้อนเกือบราบตอนหุบ) 0 = ราบสนิท")]
+        [SerializeField] private float shovelScoopTilt = 6f;
 
         // ขยับจุดแขวนขาออกข้างตามแกน Z — ขาสองข้างขนานกันแต่ไม่ตรงกัน (เหมือนเครื่องจริง
         // ที่ shovel สวนผ่านกันได้ตอนหุบ) ปรับสดได้: joint จะดึงขาไปตำแหน่งใหม่เอง
@@ -259,11 +259,12 @@ namespace ClawMachine
                 s.z = settings.ShovelWidthMeters * shovelScale / Mathf.Max(0.1f, armScale);
                 child.localScale = s;
 
-                // แผ่นขนานกับท่อนนอนของขา (เหมือนของจริง) — ตอนหุบขายังกาง ~16°
-                // แผ่นสองข้างจึงเป็นราง V เอียง: น้ำหนักกล่อง "ดันลิ่ม" ง้างขาออกได้
-                // ถ้าสปริงอ่อน (POWER ต่ำ) ขาถ่างแล้วกล่องไหลหลุด — หัวใจของเกมจริง
-                // scoopTilt = แอ่นขอบในขึ้นนิดเดียวตามรอยพับของ shovel จริง
-                child.localRotation = Quaternion.Euler(0f, 0f, inwardSign * shovelScoopTilt);
+                // วัดจากรูปท่าหุบจริง: หน้าช้อนเอียงแค่ ~6° จากแนวนอนตอนหุบ (V ตื้น)
+                // — รอยพับของ shovel หักมุมชดเชยมุมกางของขาเกือบทั้งหมด
+                // กลไกหลุดตอน POWER ต่ำ: น้ำหนักกล่องง้างขาออก → หน้าช้อนยิ่งเอียง
+                // ปลายยิ่งแยก → กล่องจมแล้วร่วงระหว่างแผ่น (trapdoor) เหมือนตู้จริง
+                child.localRotation = Quaternion.Euler(
+                    0f, 0f, inwardSign * (closedAngle - shovelScoopTilt));
             }
         }
 

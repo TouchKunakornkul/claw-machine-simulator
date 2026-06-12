@@ -393,9 +393,21 @@ namespace ClawMachine.EditorTools
                 inwardSign * ArmGeometry.FootLen / 2f, -ArmGeometry.ShoulderLen, 0f);
             foot.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 90f);
 
+            // หน้าแปลนปลายขา: หักลง ~15° จากแนวท่อนนอน (วัดจากรูป ARM S) — จุดยึด shovel
+            var flange = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            flange.name = name + "_Flange";
+            flange.transform.SetParent(pivot, false);
+            flange.transform.localScale = new Vector3(0.016f, 0.002f, 0.018f);
+            flange.transform.localPosition = new Vector3(
+                inwardSign * (ArmGeometry.FootLen + 0.006f),
+                -(ArmGeometry.ShoulderLen + 0.003f), 0f);
+            flange.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * -15f);
+            Paint(flange, metal);
+            Object.DestroyImmediate(flange.GetComponent<Collider>()); // ชิ้นรูปทรง — ใช้ collider แผ่นหลัก
+
             // shovel = แผ่นพับยึดปลายท่อนนอน (13-4: W30/W40/W60 ตามชนิดของรางวัล)
             // แผ่นแบนช้อนใต้ของ — หนีบไม่ได้ ได้แต่รอง/ตักตามฟิสิกส์จริง
-            // มุมแผ่นจะถูก ClawGripSystem.ApplyShovel ตั้งให้ราบพอดีตอนหุบ
+            // มุมหน้าช้อน: ClawGripSystem.ApplyShovel ตั้งให้ V ตื้น ~6° ตอนหุบ (วัดจากรูปจริง)
             var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tip.name = name + "_Shovel_" + settings.shovel;
             tip.transform.SetParent(pivot, false);
