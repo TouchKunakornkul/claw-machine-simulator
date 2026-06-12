@@ -26,7 +26,7 @@ namespace ClawMachine
         public const float FootLen = 0.05f;        // ท่อนนอน: ข้อศอก -> จุดยึด shovel
         public const float PlateLen = 0.03f;       // ความยาวแผ่น shovel (ปรับตามสัดส่วนภาพจริง)
         public const float PlateCenterBeyondFoot = 0.008f; // กึ่งกลางแผ่นเลยปลายท่อนนอน
-        public const float PivotOut = 0.025f;      // pivot สองข้างแยกจากแกนกลางหัวข้างละ (ห่างกัน 5cm)
+        public const float PivotOut = 0.035f;      // โคนขาห่างกัน 7cm (exploded view 26: ARM SHAFT อยู่ปลายสองข้างของ bracket)
 
         /// <summary>ระยะปลาย shovel ยื่นเข้าหากึ่งกลาง เมื่อ hinge มุม 0 (ขาดิ่ง เท้านอน)</summary>
         public const float TipIn = FootLen + PlateCenterBeyondFoot + PlateLen / 2f;
@@ -89,6 +89,11 @@ namespace ClawMachine
         [Tooltip("ตอนยกรอบปกติ (kakuritsu C3) — อ่อนจนน้ำหนักของดันขากางได้")]
         [SerializeField] private float springWeak = 0.25f;
         [SerializeField] private float springDamper = 0.01f;
+        [Tooltip("ความเร็วมอเตอร์พาขากาง/หุบ (องศา/วินาที) — เป้าสปริงเลื่อนทีละนิด\n" +
+                 "เหมือนแคมมอเตอร์จริง ขาจะไม่สะบัดพรวดตอนเปลี่ยนท่า")]
+        [SerializeField] private float armMotorSpeed = 120f;
+        [Tooltip("สเกลแผ่น shovel เพิ่มเติม (ปรับตามตา ไม่กระทบ W30/40/60)")]
+        [SerializeField] private float shovelScale = 1f;
         [Tooltip("ตัวแปลงแรงหนีบ (N) จาก MachineSettings -> ความแข็งสปริง (N·m/องศา)\n" +
                  "ต้องเล็กมาก: spring ของ Unity คิดแรงตามองศาที่เบี่ยง — ค่าใหญ่จะแข็งจน" +
                  "น้ำหนักของง้างขาไม่ออก (POWER ต่ำแล้วของต้องหลุดจริง)")]
@@ -110,6 +115,11 @@ namespace ClawMachine
         private HingeJoint leftHinge;
         private HingeJoint rightHinge;
 
+        // เป้าหมายของ phase ปัจจุบัน กับเป้าที่ "มอเตอร์" เลื่อนไปถึงแล้ว
+        private float desiredAngle;
+        private float desiredSpring;
+        private float currentAngle;
+
         private void Awake()
         {
             anchor = GetComponent<Rigidbody>();
@@ -129,11 +139,18 @@ namespace ClawMachine
                         Physics.IgnoreCollision(lc, rc, true);
             }
 
-            ReapplyPhase(); // เริ่มแบบเครื่องจริง: ขาหุบพัก
+            ReapplyPhase();              // เริ่มแบบเครื่องจริง: ขาหุบพัก
+            currentAngle = desiredAngle; // เฟรมแรกไม่ต้องเลื่อน
+            SetHinges(currentAngle, desiredSpring);
         }
 
         private void FixedUpdate()
         {
+            // "มอเตอร์" พาเป้าสปริงเลื่อนทีละนิด — ขากาง/หุบนุ่มเหมือนแคมจริง
+            currentAngle = Mathf.MoveTowards(
+                currentAngle, desiredAngle, armMotorSpeed * Time.fixedDeltaTime);
+            SetHinges(currentAngle, desiredSpring);
+
             // สถานะ "มีของในง่าม" — เช็คทาง physics ล้วน ไว้โชว์ HUD
             IsHolding = Phase != GripPhase.Open && Phase != GripPhase.RestClosed
                         && PrizeBetweenArms();
@@ -156,6 +173,8 @@ namespace ClawMachine
         public float SpringWeakVal { get => springWeak; set { springWeak = value; ReapplyPhase(); } }
         public float DamperVal { get => springDamper; set { springDamper = value; ReapplyPhase(); } }
         public float ResistanceAngleDeg { get => resistanceAngle; set => resistanceAngle = value; }
+        public float ShovelScaleVal { get => shovelScale; set { shovelScale = value; ApplyFromSettings(); } }
+        public float ArmMotorSpeedVal { get => armMotorSpeed; set => armMotorSpeed = value; }
         public float LeftHingeAngle => leftHinge != null ? leftHinge.angle : 0f;
         public float RightHingeAngle => rightHinge != null ? rightHinge.angle : 0f;
 
@@ -223,26 +242,30 @@ namespace ClawMachine
                 if (!child.name.Contains("_Shovel")) continue;
 
                 var s = child.localScale;
-                s.z = settings.ShovelWidthMeters / Mathf.Max(0.1f, armScale);
+                s.x = ArmGeometry.PlateLen * shovelScale;
+                s.z = settings.ShovelWidthMeters * shovelScale / Mathf.Max(0.1f, armScale);
                 child.localScale = s;
 
-                // แผ่นราบ (แนวนอน) พอดีเมื่อขาหุบที่ closedAngle + แอ่นรับขอบในขึ้นอีกนิด
-                child.localRotation = Quaternion.Euler(
-                    0f, 0f, inwardSign * (closedAngle + shovelScoopTilt));
+                // แผ่นขนานกับท่อนนอนของขา (เหมือนของจริง) — ตอนหุบขายังกาง ~16°
+                // แผ่นสองข้างจึงเป็นราง V เอียง: น้ำหนักกล่อง "ดันลิ่ม" ง้างขาออกได้
+                // ถ้าสปริงอ่อน (POWER ต่ำ) ขาถ่างแล้วกล่องไหลหลุด — หัวใจของเกมจริง
+                // scoopTilt = แอ่นขอบในขึ้นนิดเดียวตามรอยพับของ shovel จริง
+                child.localRotation = Quaternion.Euler(0f, 0f, inwardSign * shovelScoopTilt);
             }
         }
 
-        /// <summary>apply มุม/สปริงของ phase ปัจจุบันใหม่ (หลังค่าโดนแก้สดๆ)</summary>
+        /// <summary>ตั้งเป้ามุม/สปริงของ phase ปัจจุบัน (มอเตอร์ใน FixedUpdate พาไปถึงเอง)</summary>
         public void ReapplyPhase()
         {
             switch (Phase)
             {
-                case GripPhase.RestClosed: SetHinges(closedAngle, springOpen); break;
-                case GripPhase.Open: SetHinges(openAngle, springOpen); break;
-                case GripPhase.C3Normal: SetHinges(closedAngle, springWeak); break;
+                case GripPhase.RestClosed: desiredAngle = closedAngle; desiredSpring = springOpen; break;
+                case GripPhase.Open: desiredAngle = openAngle; desiredSpring = springOpen; break;
+                case GripPhase.C3Normal: desiredAngle = closedAngle; desiredSpring = springWeak; break;
                 case GripPhase.C4Transport:
-                    SetHinges(closedAngle, Mathf.Lerp(springWeak, springStrong, 0.7f)); break;
-                default: SetHinges(closedAngle, springStrong); break;
+                    desiredAngle = closedAngle;
+                    desiredSpring = Mathf.Lerp(springWeak, springStrong, 0.7f); break;
+                default: desiredAngle = closedAngle; desiredSpring = springStrong; break;
             }
         }
 
@@ -295,11 +318,11 @@ namespace ClawMachine
 
         private void SetHinges(float angleMagnitude, float springForce)
         {
-            ApplyHinge(leftHinge, +angleMagnitude, springForce);
-            ApplyHinge(rightHinge, -angleMagnitude, springForce);
+            ApplyHinge(leftHinge, +angleMagnitude, springForce, +1f);
+            ApplyHinge(rightHinge, -angleMagnitude, springForce, -1f);
         }
 
-        private void ApplyHinge(HingeJoint hinge, float target, float springForce)
+        private void ApplyHinge(HingeJoint hinge, float target, float springForce, float outwardSign)
         {
             if (hinge == null) return;
             var s = hinge.spring;
@@ -308,6 +331,15 @@ namespace ClawMachine
             s.targetPosition = target;
             hinge.spring = s;
             hinge.useSpring = true;
+
+            // stop กลไกแบบเครื่องจริง: ขาโดนง้าง "ออก" ได้ แต่หุบ "เกิน" จุดหุบสุดไม่ได้
+            // (สปริงเป็นตัวส่งแรงระหว่างกลไกกับขา ไม่ใช่ขาห้อยแกว่งอิสระ)
+            var lim = hinge.limits;
+            float stop = closedAngle - 2f;
+            if (outwardSign > 0f) { lim.min = stop; lim.max = 85f; }
+            else { lim.min = -85f; lim.max = -stop; }
+            hinge.limits = lim;
+            hinge.useLimits = true;
         }
 
         private void OnDrawGizmosSelected()

@@ -158,6 +158,9 @@ namespace ClawMachine
             {
                 grip.SpringOpenVal = Slider($"สปริงตอนกาง: {grip.SpringOpenVal:0.00}", grip.SpringOpenVal, 0.05f, 3f);
                 grip.DamperVal = Slider($"Damper: {grip.DamperVal:0.000}", grip.DamperVal, 0.005f, 0.5f);
+                grip.ArmMotorSpeedVal = Slider($"ความเร็วมอเตอร์กาง/หุบ: {grip.ArmMotorSpeedVal:0}°/s", grip.ArmMotorSpeedVal, 30f, 360f);
+                float newShovelScale = Slider($"สเกล shovel (ตามตา): {grip.ShovelScaleVal:0.00}", grip.ShovelScaleVal, 0.5f, 1.5f);
+                if (!Mathf.Approximately(newShovelScale, grip.ShovelScaleVal)) grip.ShovelScaleVal = newShovelScale;
                 grip.ResistanceAngleDeg = Slider($"มุมต้านหยุดดิ่ง: {grip.ResistanceAngleDeg:0}°", grip.ResistanceAngleDeg, 5f, 35f);
                 if (claw != null)
                 {
