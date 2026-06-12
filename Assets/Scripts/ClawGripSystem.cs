@@ -7,7 +7,8 @@ namespace ClawMachine
     /// </summary>
     public enum GripPhase
     {
-        Open,        // ขากาง ไม่จับ
+        RestClosed,  // ขาหุบพักตอนเล็ง (เครื่องจริงขาหุบตลอด กางเฉพาะก่อนดิ่ง)
+        Open,        // ขากางก่อนดิ่ง/ตอนปล่อยของ
         C1,          // หุบแรงเต็มตอนล่างสุด
         C3Normal,    // ยกขึ้น รอบปกติ — สปริงอ่อน ของดันขากางหลุดเอง
         C3Payout,    // ยกขึ้น รอบจ่าย — สปริงแข็ง ประคองของไว้ได้
@@ -23,8 +24,8 @@ namespace ClawMachine
     {
         public const float ShoulderLen = 0.115f;   // ท่อนดิ่ง: pivot -> ข้อศอก
         public const float FootLen = 0.05f;        // ท่อนนอน: ข้อศอก -> จุดยึด shovel
-        public const float PlateLen = 0.045f;      // ความยาวแผ่น shovel
-        public const float PlateCenterBeyondFoot = 0.01f; // กึ่งกลางแผ่นเลยปลายท่อนนอน
+        public const float PlateLen = 0.035f;      // ความยาวแผ่น shovel (W40 จริง ~4cm)
+        public const float PlateCenterBeyondFoot = 0.008f; // กึ่งกลางแผ่นเลยปลายท่อนนอน
         public const float PivotOut = 0.018f;      // pivot สองข้างแยกจากแกนกลางหัวข้างละ
 
         /// <summary>ระยะปลาย shovel ยื่นเข้าหากึ่งกลาง เมื่อ hinge มุม 0 (ขาดิ่ง เท้านอน)</summary>
@@ -87,9 +88,11 @@ namespace ClawMachine
         [SerializeField] private float springStrong = 1.8f;
         [Tooltip("ตอนยกรอบปกติ (kakuritsu C3) — อ่อนจนน้ำหนักของดันขากางได้")]
         [SerializeField] private float springWeak = 0.25f;
-        [SerializeField] private float springDamper = 0.05f;
-        [Tooltip("ตัวแปลงแรงหนีบ (N) จาก MachineSettings -> ความแข็งสปริง")]
-        [SerializeField] private float springPerNewton = 0.05f;
+        [SerializeField] private float springDamper = 0.01f;
+        [Tooltip("ตัวแปลงแรงหนีบ (N) จาก MachineSettings -> ความแข็งสปริง (N·m/องศา)\n" +
+                 "ต้องเล็กมาก: spring ของ Unity คิดแรงตามองศาที่เบี่ยง — ค่าใหญ่จะแข็งจน" +
+                 "น้ำหนักของง้างขาไม่ออก (POWER ต่ำแล้วของต้องหลุดจริง)")]
+        [SerializeField] private float springPerNewton = 0.0008f;
 
         [Header("ตรวจสถานะ")]
         [Tooltip("ระยะรอบ grabPoint ที่ถือว่า 'มีของอยู่ในง่าม' (ใช้แสดงผล/หยุดดิ่ง)")]
@@ -99,7 +102,7 @@ namespace ClawMachine
         [SerializeField] private Transform grabPoint;
         [SerializeField] private LayerMask prizeLayer = ~0;
 
-        public GripPhase Phase { get; private set; } = GripPhase.Open;
+        public GripPhase Phase { get; private set; } = GripPhase.RestClosed;
         /// <summary>มีของอยู่ระหว่างง่ามไหม (ตรวจทาง physics ไม่มีการยึด)</summary>
         public bool IsHolding { get; private set; }
 
@@ -126,13 +129,14 @@ namespace ClawMachine
                         Physics.IgnoreCollision(lc, rc, true);
             }
 
-            SetHinges(openAngle, springOpen);
+            ReapplyPhase(); // เริ่มแบบเครื่องจริง: ขาหุบพัก
         }
 
         private void FixedUpdate()
         {
             // สถานะ "มีของในง่าม" — เช็คทาง physics ล้วน ไว้โชว์ HUD
-            IsHolding = Phase != GripPhase.Open && PrizeBetweenArms();
+            IsHolding = Phase != GripPhase.Open && Phase != GripPhase.RestClosed
+                        && PrizeBetweenArms();
         }
 
         /// <summary>ขาโดนของดันจนเบี่ยงเกิน threshold = แรงต้านจริง (ใช้หยุดการดิ่ง)</summary>
@@ -180,10 +184,12 @@ namespace ClawMachine
             openAngle = Mathf.Max(settings.openArmAngle, closedAngle + 8f);
 
             // 11-1 + 13-3: POWER × ตำแหน่งสปริง × ขนาดขา -> ความแข็งสปริง
-            springStrong = Mathf.Max(0.05f, settings.FullGripForce * springPerNewton);
+            // POWER ต่ำ = สปริงอ่อนจริงๆ: น้ำหนักกล่อง (~0.06 N·m ที่ปลายขา) ง้างขา
+            // จนแผ่นเอียง ของไถลหลุดตอนยก / POWER สูงถึงจะต้านไหว
+            springStrong = Mathf.Max(0.002f, settings.FullGripForce * springPerNewton);
             springWeak = settings.segaMode
                 ? springStrong // SEGA แท้: แรงคงที่ทุกตา
-                : Mathf.Max(0.02f, springStrong * settings.normalGripRatio);
+                : Mathf.Max(0.001f, springStrong * settings.normalGripRatio);
 
             // 13-4: เปลี่ยนความกว้างแผ่น shovel (W30/W40/W60) สดๆ
             // หารด้วย armScale เพื่อให้ W30/40/60 เป็นขนาดสัมบูรณ์ ไม่โดนสเกลขาคูณซ้ำ
@@ -231,6 +237,7 @@ namespace ClawMachine
         {
             switch (Phase)
             {
+                case GripPhase.RestClosed: SetHinges(closedAngle, springOpen); break;
                 case GripPhase.Open: SetHinges(openAngle, springOpen); break;
                 case GripPhase.C3Normal: SetHinges(closedAngle, springWeak); break;
                 case GripPhase.C4Transport:
@@ -244,6 +251,13 @@ namespace ClawMachine
         public void OpenArms()
         {
             Phase = GripPhase.Open;
+            ReapplyPhase();
+        }
+
+        /// <summary>ขาหุบพักตอนเล็ง (เครื่องจริงขาหุบตลอด กางเฉพาะตอนจะดิ่ง)</summary>
+        public void RestArms()
+        {
+            Phase = GripPhase.RestClosed;
             ReapplyPhase();
         }
 

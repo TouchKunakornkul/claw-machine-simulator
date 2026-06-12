@@ -17,7 +17,7 @@ MonoBehaviour:
   armSize: 1
   shovel: 1
   shovelGapCm: 0.5
-  openArmAngle: 50
+  openArmAngle: 55
   clawYaw: 45
   armOffsetCm: 1.6
   segaMode: 1

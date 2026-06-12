@@ -179,7 +179,7 @@ namespace ClawMachine.EditorTools
         // ใต้คานทั้งหมดคือหลุมรับของ — กล่องร่วงจากคานตรงไหนก็ได้ = ได้รางวัล
         // อ้างอิง: กล่อง figure จริง ~20cm เกยคานข้างละ ~1cm
         private const float BarZ = 0.075f;      // ตำแหน่ง z กึ่งกลางคานแต่ละอัน (±)
-        private const float BarDia = 0.03f;     // เส้นผ่านศูนย์กลางคาน 3cm
+        private const float BarDia = 0.025f;    // เส้นผ่านศูนย์กลางคาน 2.5cm
         private const float BarTopY = 0.16f;    // ผิวบนคาน
         private const float GapHalfZ = BarZ - BarDia / 2f; // ขอบในคาน (ช่องใน 12cm)
 
@@ -454,6 +454,10 @@ namespace ClawMachine.EditorTools
 
                 var rb = go.AddComponent<Rigidbody>();
                 rb.mass = 0.4f; // กล่อง figure + ของข้างใน ~400g
+                // figure ตั้งในกล่อง = หนักล่าง: วางบนคานนิ่งกว่า และตอนโดนช้อน
+                // จะหมุน/ไถลรอบฐานสมจริง (เล็งปลายกล่องเพื่องัดได้)
+                // หน่วยเป็น local ของ unit cube (โดน scale อีกที): -0.28 × สูง 9cm ≈ ต่ำลง 2.5cm
+                rb.centerOfMass = new Vector3(0f, -0.28f, 0f);
                 rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
 
