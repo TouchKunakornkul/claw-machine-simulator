@@ -323,7 +323,7 @@ namespace ClawMachine.EditorTools
             s.springStage = MachineSettings.SpringStage.Middle;
             s.armSize = MachineSettings.ArmSize.L; // กล่อง figure 20cm ร้านจริงใช้ขา L
             s.shovel = MachineSettings.ShovelType.W40;
-            s.openArmAngle = 70f; // ขาตัว L ท่อนนอนยาว ต้องกางมากถึงคร่อมกล่อง 10cm
+            s.openArmAngle = 80f; // กางเต็มมาตรฐาน: ปลายเล็บถึงระดับข้อศอก (ง่ามกว้าง ~20cm)
             s.shovelGapCm = 0.1f; // สเปคจริงจาก exploded view: 1±1 mm
             s.clawYaw = 0f;       // กางขนานคาน (ปรับทแยงได้ในแผง Tab)
             s.armOffsetCm = 1.6f; // ขาขนานแต่เยื้องกัน — shovel สวนผ่านกันได้ตอนหุบ
@@ -369,8 +369,8 @@ namespace ClawMachine.EditorTools
             spring.damper = 0.05f;
             hinge.spring = spring;
             var limits = hinge.limits;
-            limits.min = -95f;
-            limits.max = 95f;
+            limits.min = -100f;
+            limits.max = 100f;
             hinge.limits = limits;
             hinge.useLimits = true;
 

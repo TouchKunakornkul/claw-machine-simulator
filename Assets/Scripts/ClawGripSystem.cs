@@ -344,12 +344,12 @@ namespace ClawMachine
             hinge.spring = s;
             hinge.useSpring = true;
 
-            // stop กลไกแบบเครื่องจริง: ขาโดนง้าง "ออก" ได้ (ถึง 95°) แต่หุบ "เกิน" จุดหุบสุดไม่ได้
+            // stop กลไกแบบเครื่องจริง: ขาโดนง้าง "ออก" ได้ (ถึง 100°) แต่หุบ "เกิน" จุดหุบสุดไม่ได้
             // (สปริงเป็นตัวส่งแรงระหว่างกลไกกับขา ไม่ใช่ขาห้อยแกว่งอิสระ)
             var lim = hinge.limits;
             float stop = closedAngle - 2f;
-            if (outwardSign > 0f) { lim.min = stop; lim.max = 95f; }
-            else { lim.min = -95f; lim.max = -stop; }
+            if (outwardSign > 0f) { lim.min = stop; lim.max = 100f; }
+            else { lim.min = -100f; lim.max = -stop; }
             hinge.limits = lim;
             hinge.useLimits = true;
         }

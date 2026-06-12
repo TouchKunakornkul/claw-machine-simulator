@@ -86,7 +86,7 @@ namespace ClawMachine
             // ===== 13-5: มุมกางขา =====
             GUILayout.Space(8);
             GUILayout.Label($"<b>13-5  มุมกางขา</b>  {s.openArmAngle:0}°  (เลื่อน A=กว้าง / B=แคบ)", Rich());
-            float newOpen = GUILayout.HorizontalSlider(s.openArmAngle, 30f, 80f);
+            float newOpen = GUILayout.HorizontalSlider(s.openArmAngle, 40f, 88f);
             if (!Mathf.Approximately(newOpen, s.openArmAngle)) { s.openArmAngle = newOpen; changed = true; }
 
             // ===== ทิศการกางขาเทียบคาน (การติดตั้ง — ไม่มีใน manual) =====
