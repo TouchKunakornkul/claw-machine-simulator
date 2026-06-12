@@ -313,23 +313,29 @@ namespace ClawMachine.EditorTools
             s.openArmAngle = 50f; // spec จริง: กาง ~45-50° ช่องเปิดพอคร่อมกล่อง figure
             s.shovelGapCm = 0.5f; // 13-4: ปลายเกือบแตะ ไม่ overlap
             s.clawYaw = 45f;      // ตู้จริงส่วนใหญ่ขากางทแยง 45° กับคาน
+            s.armOffsetCm = 1.6f; // ขาขนานแต่เยื้องกัน — shovel สวนผ่านกันได้ตอนหุบ
             s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
             Directory.CreateDirectory("Assets/Physics");
             AssetDatabase.CreateAsset(s, SettingsPath);
             return s;
         }
 
-        // ง่ามคีบ = นิ้วโค้ง 2 ท่อน (capsule) + ปลายแหลมงอเข้า แบบ UFO catcher จริง
+        // ขาตัว L ตาม manual จริง (ARM S/M/L): ท่อนดิ่งจาก pivot + หักศอกเป็นท่อนนอนยื่นเข้าใน
+        // + shovel แผ่นพับยึดปลายท่อนนอน — ขนาด/ระยะทั้งหมดมาจาก ArmGeometry (ชุดเดียวกับ grip)
+        // ขาสองข้างขนานกันแต่ "เยื้องกัน" ตามแกน Z เหมือนเครื่องจริง (shovel สวนผ่านกันได้)
         // ขาเป็น Rigidbody ห้อยจากหัวด้วย HingeJoint -> เบนหลบของได้ (สมจริงตาม manual: ขาสปริง)
         private static Transform BuildArm(string name, Transform parent, PhysicsMaterial mat,
             float inwardSign, Rigidbody headAnchor, MachineSettings settings)
         {
             var metal = new Color(0.82f, 0.82f, 0.87f);
 
-            // pivot ที่แกนกลางหัวคีบ — หมุนรอบ Z เพื่อหุบ/กาง
+            // pivot แยกออกจากแกนกลางเล็กน้อย + เยื้องข้างตามแกน Z (ซ้าย +z / ขวา -z)
             var pivot = new GameObject(name).transform;
             pivot.SetParent(parent, false);
-            pivot.localPosition = new Vector3(0f, -0.03f, 0f);
+            pivot.localPosition = new Vector3(
+                -inwardSign * ArmGeometry.PivotOut,
+                -0.03f,
+                -inwardSign * settings.armOffsetCm * 0.005f);
 
             // physics: ขาห้อยจากหัวคีบ แกว่ง/เบนได้รอบแกน Z
             var rb = pivot.gameObject.AddComponent<Rigidbody>();
@@ -341,6 +347,8 @@ namespace ClawMachine.EditorTools
             hinge.connectedBody = headAnchor;
             hinge.anchor = Vector3.zero;            // หมุนรอบจุดบนสุดของขา
             hinge.axis = Vector3.forward;           // แกน Z
+            hinge.autoConfigureConnectedAnchor = false;
+            hinge.connectedAnchor = pivot.localPosition; // local ของ clawHead (= connected body)
             hinge.useSpring = true;
             var spring = hinge.spring;
             spring.targetPosition = -inwardSign * settings.openArmAngle; // ซ้าย=+ / ขวา=- (มิเรอร์)
@@ -353,28 +361,29 @@ namespace ClawMachine.EditorTools
             hinge.limits = limits;
             hinge.useLimits = true;
 
-            // ท่อนบน (shoulder): ยื่นลงบานออกเล็กน้อย
+            // ท่อนดิ่ง (shoulder): จาก pivot ตรงลงข้อศอก
             var shoulder = MakeCapsule(name + "_Shoulder", pivot, mat, metal);
-            shoulder.localScale = new Vector3(0.02f, 0.04f, 0.02f);
-            shoulder.localPosition = new Vector3(-inwardSign * 0.012f, -0.05f, 0f);
-            shoulder.localRotation = Quaternion.Euler(0f, 0f, -inwardSign * 14f);
+            shoulder.localScale = new Vector3(0.016f, ArmGeometry.ShoulderLen / 2f, 0.012f);
+            shoulder.localPosition = new Vector3(0f, -ArmGeometry.ShoulderLen / 2f, 0f);
 
-            // ท่อนล่าง (finger): โค้งเข้าหากึ่งกลางเป็นตะขอ
-            var finger = MakeCapsule(name + "_Finger", pivot, mat, metal);
-            finger.localScale = new Vector3(0.017f, 0.045f, 0.017f);
-            finger.localPosition = new Vector3(-inwardSign * 0.004f, -0.12f, 0f);
-            finger.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 26f);
+            // ท่อนนอน (foot): หักศอก ~90° ยื่นเข้าหากึ่งกลาง
+            var foot = MakeCapsule(name + "_Foot", pivot, mat, metal);
+            foot.localScale = new Vector3(0.014f, ArmGeometry.FootLen / 2f, 0.012f);
+            foot.localPosition = new Vector3(
+                inwardSign * ArmGeometry.FootLen / 2f, -ArmGeometry.ShoulderLen, 0f);
+            foot.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 90f);
 
-            // shovel = แผ่นแบนช้อนใต้ของ (13-4: W30/W40/W60 ตามชนิดของรางวัล)
-            // เอียงมากจนเกือบนอนตอนหุบ — หนีบไม่ได้ ได้แต่รอง/ตักตามฟิสิกส์จริง
+            // shovel = แผ่นพับยึดปลายท่อนนอน (13-4: W30/W40/W60 ตามชนิดของรางวัล)
+            // แผ่นแบนช้อนใต้ของ — หนีบไม่ได้ ได้แต่รอง/ตักตามฟิสิกส์จริง
+            // มุมแผ่นจะถูก ClawGripSystem.ApplyShovel ตั้งให้ราบพอดีตอนหุบ
             var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tip.name = name + "_Shovel_" + settings.shovel;
             tip.transform.SetParent(pivot, false);
-            // เรขาคณิต spec จริง: กาง 50° ช่องเปิด ~17cm / หุบ 15° ปลายเกือบแตะ (ไม่ทับกัน)
-            // มุมปลาย = closedAngle+scoop เพื่อให้แผ่นราบพอดีตอนหุบ (grip จะอัปเดตสดอีกที)
-            tip.transform.localScale = new Vector3(0.04f, 0.006f, settings.ShovelWidthMeters);
-            tip.transform.localPosition = new Vector3(inwardSign * 0.02f, -0.165f, 0f);
-            tip.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 20f);
+            tip.transform.localScale = new Vector3(
+                ArmGeometry.PlateLen, 0.004f, settings.ShovelWidthMeters);
+            tip.transform.localPosition = new Vector3(
+                inwardSign * (ArmGeometry.FootLen + ArmGeometry.PlateCenterBeyondFoot),
+                -ArmGeometry.TipDown, 0f);
             Paint(tip, metal);
             var tcol = tip.GetComponent<BoxCollider>();
             if (mat != null) tcol.sharedMaterial = mat;

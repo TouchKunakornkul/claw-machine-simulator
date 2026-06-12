@@ -105,6 +105,14 @@ namespace ClawMachine
             float newYaw = GUILayout.HorizontalSlider(s.clawYaw, 0f, 90f);
             if (!Mathf.Approximately(newYaw, s.clawYaw)) { s.clawYaw = newYaw; changed = true; }
 
+            // ===== ระยะเยื้องขา (ดีไซน์ hub — ขาขนานกันแต่ไม่ตรงกัน) =====
+            GUILayout.Space(4);
+            GUILayout.Label(
+                $"<b>ระยะเยื้องขาซ้าย-ขวา</b>  {s.armOffsetCm:0.0} cm  " +
+                "(ขาขนานแต่ไม่ตรงกัน — shovel สวนกันได้)", Rich());
+            float newOff = GUILayout.HorizontalSlider(s.armOffsetCm, 0f, 4f);
+            if (!Mathf.Approximately(newOff, s.armOffsetCm)) { s.armOffsetCm = newOff; changed = true; }
+
             // ===== ประเภทตู้ =====
             GUILayout.Space(8);
             GUILayout.Label("<b>ประเภทตู้</b>", Rich());

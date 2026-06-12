@@ -50,9 +50,9 @@ namespace ClawMachine
         public void ApplyFromSettings()
         {
             if (machineSettings == null) return;
-            // รัศมีปลายขาตอนกาง = sin(มุมกาง) × ความยาวขา (ขา M = 0.165m)
-            float tipReach = Mathf.Sin(machineSettings.openArmAngle * Mathf.Deg2Rad)
-                             * 0.165f * machineSettings.ArmSizeScale;
+            // รัศมีปลายขาตอนกาง — คิดจากเรขาคณิตขาตัว L จริง (ท่อนดิ่ง+ท่อนนอน+shovel)
+            float tipReach = ArmGeometry.OpenTipReach(
+                machineSettings.openArmAngle, machineSettings.ArmSizeScale);
             float limit = Mathf.Max(0.05f, cabinetHalfExtent - tipReach - wallClearance);
             xLimits = new Vector2(-limit, limit);
             zLimits = new Vector2(-limit, limit);

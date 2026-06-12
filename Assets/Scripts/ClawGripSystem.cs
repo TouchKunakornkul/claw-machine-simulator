@@ -15,6 +15,48 @@ namespace ClawMachine
     }
 
     /// <summary>
+    /// เรขาคณิตขาตัว L ตาม manual จริง (ACCESSORIES: ARM S UCS-3430 / ARM L UCS-3432)
+    /// ขา = ท่อนดิ่งจาก pivot ลงมา + หักศอก ~90° เป็นท่อนนอนยื่นเข้าใน + shovel ยึดปลาย
+    /// ขนาดเป็นขา M — builder และ grip ต้องใช้ชุดเดียวกันเสมอ
+    /// </summary>
+    public static class ArmGeometry
+    {
+        public const float ShoulderLen = 0.115f;   // ท่อนดิ่ง: pivot -> ข้อศอก
+        public const float FootLen = 0.05f;        // ท่อนนอน: ข้อศอก -> จุดยึด shovel
+        public const float PlateLen = 0.045f;      // ความยาวแผ่น shovel
+        public const float PlateCenterBeyondFoot = 0.01f; // กึ่งกลางแผ่นเลยปลายท่อนนอน
+        public const float PivotOut = 0.018f;      // pivot สองข้างแยกจากแกนกลางหัวข้างละ
+
+        /// <summary>ระยะปลาย shovel ยื่นเข้าหากึ่งกลาง เมื่อ hinge มุม 0 (ขาดิ่ง เท้านอน)</summary>
+        public const float TipIn = FootLen + PlateCenterBeyondFoot + PlateLen / 2f;
+        /// <summary>ระยะปลาย shovel ต่ำกว่า pivot เมื่อ hinge มุม 0</summary>
+        public const float TipDown = ShoulderLen + 0.006f;
+
+        /// <summary>
+        /// มุมหุบ (องศากางออกจากแนวดิ่ง) ที่ทำให้ปลาย shovel สองข้างห่างกัน = gap
+        /// (13-4 overlap adjustment screw — gap 0 คือปลายพบกันพอดีใต้ของ)
+        /// </summary>
+        public static float ClosedAngleDeg(float armScale, float gapMeters)
+        {
+            float tipIn = TipIn * armScale;
+            float tipDown = TipDown * armScale;
+            float r = Mathf.Sqrt(tipIn * tipIn + tipDown * tipDown);
+            float delta = Mathf.Atan2(tipDown, tipIn) * Mathf.Rad2Deg;
+            float c = Mathf.Clamp((PivotOut + gapMeters / 2f) / r, -0.99f, 0.99f);
+            float phi = Mathf.Acos(c) * Mathf.Rad2Deg - delta;
+            return Mathf.Clamp(phi, 2f, 60f);
+        }
+
+        /// <summary>รัศมีปลายขาวัดจากแกนกลางหัว ตอนกาง — ใช้คำนวณ 13-2 sensor bracket</summary>
+        public static float OpenTipReach(float openDeg, float armScale)
+        {
+            float rad = openDeg * Mathf.Deg2Rad;
+            float outward = (TipDown * Mathf.Sin(rad) - TipIn * Mathf.Cos(rad)) * armScale;
+            return PivotOut + Mathf.Max(0f, outward);
+        }
+    }
+
+    /// <summary>
     /// ขา 2 ข้างแบบ physics ล้วน (HingeJoint + spring) — ไม่มีการ "ดูดติด" ใดๆ
     ///
     /// หลักการจริง (research + SEGA manual):
@@ -113,10 +155,6 @@ namespace ClawMachine
         public float LeftHingeAngle => leftHinge != null ? leftHinge.angle : 0f;
         public float RightHingeAngle => rightHinge != null ? rightHinge.angle : 0f;
 
-        // เรขาคณิตขาขนาด M (ต้องตรงกับ ClawSceneBuilder): ความยาว pivot->shovel และระยะ shovel ยื่นเข้าใน
-        private const float ArmLengthM = 0.165f;
-        private const float ShovelReachM = 0.04f;
-
         /// <summary>คำนวณค่าทั้งหมดใหม่จาก MachineSettings (เรียกเมื่อหมุนแผงปรับ)</summary>
         public void ApplyFromSettings()
         {
@@ -130,15 +168,16 @@ namespace ClawMachine
             if (leftArm != null) leftArm.localScale = Vector3.one * armScale;
             if (rightArm != null) rightArm.localScale = Vector3.one * armScale;
 
-            // 13-5: มุมกางขา
-            openAngle = settings.openArmAngle;
+            // ขาขนานกันแต่ "เยื้องกัน" เหมือนเครื่องจริง — ขยับจุดแขวน hinge ตามแกน Z
+            ApplyArmOffset(leftHinge, +1f);
+            ApplyArmOffset(rightHinge, -1f);
 
-            // 13-4: สกรูปรับระยะห่าง shovel -> แปลงเป็นมุมหุบ (gap = 2*(sinθ*L - reach))
-            // ใช้ความยาวตามขนาดขาปัจจุบัน
-            float len = ArmLengthM * armScale;
-            float reach = ShovelReachM * armScale;
-            float sinClosed = (reach + settings.shovelGapCm * 0.01f / 2f) / len;
-            closedAngle = Mathf.Asin(Mathf.Clamp(sinClosed, 0.05f, 0.95f)) * Mathf.Rad2Deg;
+            // 13-4: สกรูปรับระยะห่าง shovel -> มุมหุบของขาตัว L
+            // (ขาหุบสุดยังกางออก ~25° เหมือนเครื่องจริง — เท้าสองข้างทำมุม V ช้อนใต้ของ)
+            closedAngle = ArmGeometry.ClosedAngleDeg(armScale, settings.shovelGapCm * 0.01f);
+
+            // 13-5: มุมกางขา (ต้องกางมากกว่ามุมหุบเสมอ)
+            openAngle = Mathf.Max(settings.openArmAngle, closedAngle + 8f);
 
             // 11-1 + 13-3: POWER × ตำแหน่งสปริง × ขนาดขา -> ความแข็งสปริง
             springStrong = Mathf.Max(0.05f, settings.FullGripForce * springPerNewton);
@@ -157,6 +196,17 @@ namespace ClawMachine
 
         [Tooltip("มุมแอ่นรับของแผ่น shovel ตอนหุบ (องศา) — ขอบในเชิดขึ้นเล็กน้อยเหมือนถาด")]
         [SerializeField] private float shovelScoopTilt = 5f;
+
+        // ขยับจุดแขวนขาออกข้างตามแกน Z — ขาสองข้างขนานกันแต่ไม่ตรงกัน (เหมือนเครื่องจริง
+        // ที่ shovel สวนผ่านกันได้ตอนหุบ) ปรับสดได้: joint จะดึงขาไปตำแหน่งใหม่เอง
+        private void ApplyArmOffset(HingeJoint hinge, float sideSign)
+        {
+            if (hinge == null || settings == null) return;
+            hinge.autoConfigureConnectedAnchor = false;
+            var ca = hinge.connectedAnchor;
+            ca.z = sideSign * settings.armOffsetCm * 0.005f; // ระยะเยื้องรวม cm -> ครึ่งข้างเป็น m
+            hinge.connectedAnchor = ca;
+        }
 
         // inwardSign ต้องตรงกับตอนสร้างใน ClawSceneBuilder (ซ้าย=-1 / ขวา=+1)
         private void ApplyShovel(Transform arm, float armScale, float inwardSign)
