@@ -123,9 +123,9 @@ namespace ClawMachine.EditorTools
         {
             var root = new GameObject("Cabinet").transform;
 
-            // พื้นตู้ (ผิวบนที่ y=0)
+            // พื้นตู้ = ก้นหลุมรับของ (ผิวบนที่ y=0, สีเข้มให้รู้ว่าเป็นหลุม)
             MakeBox("Floor", new Vector3(0f, -0.025f, 0f),
-                new Vector3(0.6f, 0.05f, 0.6f), root, mat, new Color(0.2f, 0.2f, 0.22f));
+                new Vector3(0.6f, 0.05f, 0.6f), root, mat, new Color(0.06f, 0.06f, 0.08f));
 
             // ผนัง 4 ด้าน = กระจกใส (โปร่งแสง มองเห็นของข้างใน)
             var glass = CreateGlassMaterial();
@@ -175,53 +175,45 @@ namespace ClawMachine.EditorTools
         }
 
         // ===== Hashi-watashi (橋渡し) — สเกลจริงหน่วยเมตร =====
-        // คาน 2 อันวางขนานตามแกน X เว้นช่องตรงกลางตามแกน Z
-        // อ้างอิง: ช่องเล่นจริง ~50cm, คานเหล็กกลม ~2cm, กล่อง figure ~16cm
-        private const float BarZ = 0.06f;       // ตำแหน่ง z ของคานแต่ละอัน (±)
-        private const float BarThick = 0.02f;   // ความหนาคาน 2cm (จากเดิม 4cm)
+        // คานท่อกลม 2 อัน (Ø3cm หุ้มยาง) พาดชนผนังตามแกน X เหมือน "สะพานข้ามหลุม"
+        // ใต้คานทั้งหมดคือหลุมรับของ — กล่องร่วงจากคานตรงไหนก็ได้ = ได้รางวัล
+        // อ้างอิง: กล่อง figure จริง ~20cm เกยคานข้างละ ~1cm
+        private const float BarZ = 0.075f;      // ตำแหน่ง z กึ่งกลางคานแต่ละอัน (±)
+        private const float BarDia = 0.03f;     // เส้นผ่านศูนย์กลางคาน 3cm
         private const float BarTopY = 0.16f;    // ผิวบนคาน
-        private const float GapHalfZ = BarZ - BarThick / 2f; // ขอบในคาน = ครึ่งช่อง (0.05 -> ช่อง 10cm)
+        private const float GapHalfZ = BarZ - BarDia / 2f; // ขอบในคาน (ช่องใน 12cm)
 
         private static void BuildBars(PhysicsMaterial mat)
         {
             var root = new GameObject("Bars").transform;
-            float cy = BarTopY - BarThick / 2f;
+            float cy = BarTopY - BarDia / 2f;
             var barColor = new Color(0.85f, 0.2f, 0.2f); // คานสีแดงเด่น
-            MakeBar(root, "Bar_Front", new Vector3(0f, cy, -BarZ), mat, barColor);
-            MakeBar(root, "Bar_Back", new Vector3(0f, cy, BarZ), mat, barColor);
+            MakeBar(root, "Bar_Front", new Vector3(0f, cy, -BarZ), barColor);
+            MakeBar(root, "Bar_Back", new Vector3(0f, cy, BarZ), barColor);
         }
 
-        private static void MakeBar(Transform parent, string name, Vector3 pos, PhysicsMaterial mat, Color c)
+        // คานกลม: cylinder นอนตามแกน X ยาวชนผนังสองข้าง
+        // ไม่ใส่ low-friction — คานจริงหุ้มยางหนืด กล่องไม่ลื่นไถลง่าย
+        private static void MakeBar(Transform parent, string name, Vector3 pos, Color c)
         {
-            var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var bar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             bar.name = name;
             bar.transform.SetParent(parent, false);
             bar.transform.localPosition = pos;
-            bar.transform.localScale = new Vector3(0.5f, BarThick, BarThick);
+            bar.transform.localScale = new Vector3(BarDia, 0.3f, BarDia); // cylinder สูง 2 หน่วย -> ยาว 0.6
+            bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);  // นอนตามแกน X
             Paint(bar, c);
-            if (mat != null) bar.GetComponent<BoxCollider>().sharedMaterial = mat;
         }
 
-        // ช่องรับของ = โซนใต้คานตรงช่องว่าง (กล่องตกผ่านคานลงมาโดน = ได้รางวัล)
+        // จุดได้ของ = ใต้ตู้ทั้งหมด (คานเป็นสะพานข้ามหลุม — ร่วงตรงไหนก็ได้รางวัล)
         private static PrizeCatchZone BuildWinZone()
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = "WinZone";
             Object.DestroyImmediate(go.GetComponent<MeshRenderer>()); // trigger มองไม่เห็น
             go.transform.position = new Vector3(0f, 0.05f, 0f);
-            // คลุมเฉพาะใต้ช่องระหว่างคาน (z ±0.08) ไม่คลุมพื้นด้านนอก
-            go.transform.localScale = new Vector3(0.55f, 0.09f, 2f * GapHalfZ + 0.06f);
+            go.transform.localScale = new Vector3(0.58f, 0.09f, 0.58f); // คลุมพื้นตู้ทั้งหมด
             go.GetComponent<BoxCollider>().isTrigger = true;
-
-            // marker พื้นสีเข้มใต้ช่อง ให้เห็นว่าเป็นช่องรับของ
-            var hole = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            hole.name = "HoleMarker";
-            hole.transform.SetParent(go.transform, false);
-            hole.transform.localScale = new Vector3(1f, 0.04f, 1f);
-            hole.transform.localPosition = new Vector3(0f, -0.45f, 0f);
-            Object.DestroyImmediate(hole.GetComponent<Collider>());
-            Paint(hole, new Color(0.04f, 0.04f, 0.05f));
-
             return go.AddComponent<PrizeCatchZone>();
         }
 
@@ -310,7 +302,7 @@ namespace ClawMachine.EditorTools
             s.springStage = MachineSettings.SpringStage.Middle;
             s.armSize = MachineSettings.ArmSize.M;
             s.shovel = MachineSettings.ShovelType.W40;
-            s.openArmAngle = 50f; // spec จริง: กาง ~45-50° ช่องเปิดพอคร่อมกล่อง figure
+            s.openArmAngle = 55f; // ง่ามกาง ~14cm คร่อมกล่องกว้าง 10cm ได้
             s.shovelGapCm = 0.5f; // 13-4: ปลายเกือบแตะ ไม่ overlap
             s.clawYaw = 45f;      // ตู้จริงส่วนใหญ่ขากางทแยง 45° กับคาน
             s.armOffsetCm = 1.6f; // ขาขนานแต่เยื้องกัน — shovel สวนผ่านกันได้ตอนหุบ
@@ -430,13 +422,13 @@ namespace ClawMachine.EditorTools
             return cam;
         }
 
-        // กล่อง figure วางพาดขวางคาน 2 อัน (ปลายเกยคาน กลางลอยเหนือช่อง)
-        // ด้านยาว Z = 0.14 (พาดคาน) / ด้านแคบ X = 0.07 < ช่อง 0.10 → พอหมุนขนานคานก็ร่วง (tatehame)
+        // กล่อง figure วางพาดขวางคาน 2 อัน (ปลายเกยคานข้างละ ~1cm กลางลอยเหนือช่อง)
+        // หมุนขนานคานเมื่อไหร่ (กว้าง 10 < ช่องใน 12) ก็ร่วง = tatehame
         private static void SpawnBoxesOnBars(PhysicsMaterial mat, int layer)
         {
             var root = new GameObject("Figures").transform;
-            // กล่อง figure จริง ~16cm: ยาว Z=16cm (พาดคาน) / แคบ X=8cm < ช่อง 10cm / สูง 7cm
-            var boxSize = new Vector3(0.08f, 0.07f, 0.16f);
+            // กล่อง figure สเกลจริง (Banpresto ฯลฯ ~20cm): ยาว Z=20 (พาดคาน) / กว้าง X=10 / สูง 9
+            var boxSize = new Vector3(0.10f, 0.09f, 0.20f);
             float restY = BarTopY + boxSize.y / 2f + 0.001f;
 
             // โหมดทดลอง: กล่องเดียว วางท่ามาตรฐานร้านจริง — พาดขวางคานตรงๆ กลางตู้
@@ -461,7 +453,7 @@ namespace ClawMachine.EditorTools
                 if (mat != null) col.sharedMaterial = mat;
 
                 var rb = go.AddComponent<Rigidbody>();
-                rb.mass = 0.3f;
+                rb.mass = 0.4f; // กล่อง figure + ของข้างใน ~400g
                 rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
 
