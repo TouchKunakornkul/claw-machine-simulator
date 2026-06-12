@@ -24,9 +24,9 @@ namespace ClawMachine
     {
         public const float ShoulderLen = 0.115f;   // ท่อนดิ่ง: pivot -> ข้อศอก
         public const float FootLen = 0.05f;        // ท่อนนอน: ข้อศอก -> จุดยึด shovel
-        public const float PlateLen = 0.035f;      // ความยาวแผ่น shovel (W40 จริง ~4cm)
+        public const float PlateLen = 0.03f;       // ความยาวแผ่น shovel (ปรับตามสัดส่วนภาพจริง)
         public const float PlateCenterBeyondFoot = 0.008f; // กึ่งกลางแผ่นเลยปลายท่อนนอน
-        public const float PivotOut = 0.018f;      // pivot สองข้างแยกจากแกนกลางหัวข้างละ
+        public const float PivotOut = 0.025f;      // pivot สองข้างแยกจากแกนกลางหัวข้างละ (ห่างกัน 5cm)
 
         /// <summary>ระยะปลาย shovel ยื่นเข้าหากึ่งกลาง เมื่อ hinge มุม 0 (ขาดิ่ง เท้านอน)</summary>
         public const float TipIn = FootLen + PlateCenterBeyondFoot + PlateLen / 2f;

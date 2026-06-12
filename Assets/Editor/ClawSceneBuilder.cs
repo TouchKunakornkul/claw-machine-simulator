@@ -119,23 +119,28 @@ namespace ClawMachine.EditorTools
             go.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
         }
 
+        // สนามเล่นสเกลจริง (manual: ตู้กว้าง 1683mm = 2 สถานี -> ต่อคน ~84cm, ลึก 875mm)
+        private const float FieldHalfX = 0.40f; // กว้าง 80cm
+        private const float FieldHalfZ = 0.30f; // ลึก 60cm
+        private const float GlassH = 0.60f;     // กระจกสูง 60cm
+
         private static void BuildCabinet(PhysicsMaterial mat)
         {
             var root = new GameObject("Cabinet").transform;
 
             // พื้นตู้ = ก้นหลุมรับของ (ผิวบนที่ y=0, สีเข้มให้รู้ว่าเป็นหลุม)
             MakeBox("Floor", new Vector3(0f, -0.025f, 0f),
-                new Vector3(0.6f, 0.05f, 0.6f), root, mat, new Color(0.06f, 0.06f, 0.08f));
+                new Vector3(FieldHalfX * 2f, 0.05f, FieldHalfZ * 2f), root, mat, new Color(0.06f, 0.06f, 0.08f));
 
             // ผนัง 4 ด้าน = กระจกใส (โปร่งแสง มองเห็นของข้างใน)
             var glass = CreateGlassMaterial();
-            const float h = 0.35f, t = 0.012f, half = 0.3f;
+            const float t = 0.012f;
             var walls = new[]
             {
-                MakeBox("Glass_Back", new Vector3(0f, h / 2f, half), new Vector3(0.6f, h, t), root, mat, Color.white),
-                MakeBox("Glass_Front", new Vector3(0f, h / 2f, -half), new Vector3(0.6f, h, t), root, mat, Color.white),
-                MakeBox("Glass_Left", new Vector3(-half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, Color.white),
-                MakeBox("Glass_Right", new Vector3(half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, Color.white),
+                MakeBox("Glass_Back", new Vector3(0f, GlassH / 2f, FieldHalfZ), new Vector3(FieldHalfX * 2f, GlassH, t), root, mat, Color.white),
+                MakeBox("Glass_Front", new Vector3(0f, GlassH / 2f, -FieldHalfZ), new Vector3(FieldHalfX * 2f, GlassH, t), root, mat, Color.white),
+                MakeBox("Glass_Left", new Vector3(-FieldHalfX, GlassH / 2f, 0f), new Vector3(t, GlassH, FieldHalfZ * 2f), root, mat, Color.white),
+                MakeBox("Glass_Right", new Vector3(FieldHalfX, GlassH / 2f, 0f), new Vector3(t, GlassH, FieldHalfZ * 2f), root, mat, Color.white),
             };
             foreach (var w in walls)
                 w.GetComponent<MeshRenderer>().sharedMaterial = glass;
@@ -200,7 +205,7 @@ namespace ClawMachine.EditorTools
             bar.name = name;
             bar.transform.SetParent(parent, false);
             bar.transform.localPosition = pos;
-            bar.transform.localScale = new Vector3(BarDia, 0.3f, BarDia); // cylinder สูง 2 หน่วย -> ยาว 0.6
+            bar.transform.localScale = new Vector3(BarDia, FieldHalfX, BarDia); // cylinder สูง 2 หน่วย -> ยาวชนผนัง
             bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);  // นอนตามแกน X
             Paint(bar, c);
         }
@@ -212,7 +217,8 @@ namespace ClawMachine.EditorTools
             go.name = "WinZone";
             Object.DestroyImmediate(go.GetComponent<MeshRenderer>()); // trigger มองไม่เห็น
             go.transform.position = new Vector3(0f, 0.05f, 0f);
-            go.transform.localScale = new Vector3(0.58f, 0.09f, 0.58f); // คลุมพื้นตู้ทั้งหมด
+            go.transform.localScale = new Vector3(
+                FieldHalfX * 2f - 0.02f, 0.09f, FieldHalfZ * 2f - 0.02f); // คลุมพื้นตู้ทั้งหมด
             go.GetComponent<BoxCollider>().isTrigger = true;
             return go.AddComponent<PrizeCatchZone>();
         }
@@ -224,27 +230,28 @@ namespace ClawMachine.EditorTools
             var gantry = new GameObject("Gantry").transform;
             gantry.SetParent(machine, false);
             // เริ่มเหนือพื้นที่คาน (hashi-watashi คีบตรงไหนก็ปล่อยตรงนั้น)
-            gantry.localPosition = new Vector3(0f, 0.55f, -0.12f);
+            // ความสูงรางจริง: หัว UFO วิ่งใกล้เพดานกระจก
+            gantry.localPosition = new Vector3(0f, 0.72f, -0.12f);
             var claw = gantry.gameObject.AddComponent<ClawController>();
 
             var clawHead = new GameObject("ClawHead").transform;
             clawHead.SetParent(gantry, false);
             clawHead.localPosition = Vector3.zero;
 
-            // ลำตัวหัวคีบ = จานครอบ (saucer) แบบ UFO catcher
+            // ลำตัวหัวคีบ = จานครอบ (saucer) แบบ UFO catcher — เครื่องจริงหัวใหญ่ Ø ~20cm
             var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             body.name = "HeadBody";
             body.transform.SetParent(clawHead, false);
-            body.transform.localScale = new Vector3(0.09f, 0.025f, 0.09f); // แบนเป็นจาน
-            body.transform.localPosition = new Vector3(0f, 0.01f, 0f);
+            body.transform.localScale = new Vector3(0.20f, 0.035f, 0.20f); // แบนเป็นจาน
+            body.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             Paint(body, new Color(0.85f, 0.7f, 0.2f));
             Object.DestroyImmediate(body.GetComponent<Collider>());
 
-            // แกนกลางเชื่อมขา
+            // แกนกลางเชื่อมขา (mechanism กล่องใต้จาน)
             var hub = GameObject.CreatePrimitive(PrimitiveType.Cube);
             hub.name = "Hub";
             hub.transform.SetParent(clawHead, false);
-            hub.transform.localScale = new Vector3(0.03f, 0.04f, 0.03f);
+            hub.transform.localScale = new Vector3(0.07f, 0.05f, 0.05f);
             hub.transform.localPosition = new Vector3(0f, -0.025f, 0f);
             Paint(hub, new Color(0.3f, 0.3f, 0.33f));
             Object.DestroyImmediate(hub.GetComponent<Collider>());
@@ -271,7 +278,7 @@ namespace ClawMachine.EditorTools
             // อยู่ใต้ก้นกล่องก่อนหัวจะแตะของแล้วค่อยหุบ (ช้อนได้จริง)
             var dropProbe = new GameObject("DropProbe").transform;
             dropProbe.SetParent(clawHead, false);
-            dropProbe.localPosition = new Vector3(0f, -0.05f, 0f);
+            dropProbe.localPosition = new Vector3(0f, -0.055f, 0f);
 
             var cso = new SerializedObject(claw);
             cso.FindProperty("dropProbe").objectReferenceValue = dropProbe;
@@ -304,7 +311,7 @@ namespace ClawMachine.EditorTools
             s.shovel = MachineSettings.ShovelType.W40;
             s.openArmAngle = 55f; // ง่ามกาง ~14cm คร่อมกล่องกว้าง 10cm ได้
             s.shovelGapCm = 0.5f; // 13-4: ปลายเกือบแตะ ไม่ overlap
-            s.clawYaw = 45f;      // ตู้จริงส่วนใหญ่ขากางทแยง 45° กับคาน
+            s.clawYaw = 0f;       // กางขนานคาน (ปรับทแยงได้ในแผง Tab)
             s.armOffsetCm = 1.6f; // ขาขนานแต่เยื้องกัน — shovel สวนผ่านกันได้ตอนหุบ
             s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
             Directory.CreateDirectory("Assets/Physics");
@@ -402,10 +409,10 @@ namespace ClawMachine.EditorTools
 
         private static (Camera front, Camera side) BuildCameras()
         {
-            var front = MakeCamera("FrontCamera", new Vector3(0f, 0.55f, -0.95f), true);
+            var front = MakeCamera("FrontCamera", new Vector3(0f, 0.70f, -1.20f), true);
             front.gameObject.AddComponent<AudioListener>();
 
-            var side = MakeCamera("SideCamera", new Vector3(0.95f, 0.55f, 0f), false);
+            var side = MakeCamera("SideCamera", new Vector3(1.25f, 0.70f, 0f), false);
             return (front, side);
         }
 
@@ -413,7 +420,7 @@ namespace ClawMachine.EditorTools
         {
             var go = new GameObject(name);
             go.transform.position = pos;
-            go.transform.LookAt(new Vector3(0f, 0.1f, 0f));
+            go.transform.LookAt(new Vector3(0f, 0.22f, 0f));
             var cam = go.AddComponent<Camera>();
             cam.enabled = enabled;
             cam.backgroundColor = new Color(0.05f, 0.05f, 0.08f);
@@ -453,11 +460,10 @@ namespace ClawMachine.EditorTools
                 if (mat != null) col.sharedMaterial = mat;
 
                 var rb = go.AddComponent<Rigidbody>();
-                rb.mass = 0.4f; // กล่อง figure + ของข้างใน ~400g
-                // figure ตั้งในกล่อง = หนักล่าง: วางบนคานนิ่งกว่า และตอนโดนช้อน
-                // จะหมุน/ไถลรอบฐานสมจริง (เล็งปลายกล่องเพื่องัดได้)
-                // หน่วยเป็น local ของ unit cube (โดน scale อีกที): -0.28 × สูง 9cm ≈ ต่ำลง 2.5cm
-                rb.centerOfMass = new Vector3(0f, -0.28f, 0f);
+                rb.mass = 0.3f; // วัดจริง: กล่อง figure รวมกล่อง ~265-500g ส่วนใหญ่ ~300g
+                // จุดศูนย์ถ่วงจริงเกือบกึ่งกลาง ต่ำกว่านิดเดียว (รีวิวผู้เล่น: "ก้นหนักกว่า
+                // เล็กน้อย ไม่ถึงระดับมีผลกับ hashiwatashi") — local ของ unit cube
+                rb.centerOfMass = new Vector3(0f, -0.05f, 0f);
                 rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
 
@@ -480,9 +486,10 @@ namespace ClawMachine.EditorTools
                 AssetDatabase.LoadAssetAtPath<MachineSettings>(SettingsPath); // 13-2 sensor bracket
             so.FindProperty("returnToChute").boolValue = false; // hashi-watashi: ปล่อยตรงจุดที่คีบ
             so.FindProperty("yTop").floatValue = 0f;
-            so.FindProperty("yBottom").floatValue = -0.40f;
-            so.FindProperty("xLimits").vector2Value = new Vector2(-0.22f, 0.22f);
-            so.FindProperty("zLimits").vector2Value = new Vector2(-0.22f, 0.22f);
+            so.FindProperty("yBottom").floatValue = -0.58f; // gantry 0.72 - ปลายขา ~0.18 -> เกือบถึงพื้น
+            // ค่าตั้งต้นเท่านั้น — ApplyFromSettings จะคำนวณจริงจาก 13-2 ตอน Start
+            so.FindProperty("xLimits").vector2Value = new Vector2(-0.30f, 0.30f);
+            so.FindProperty("zLimits").vector2Value = new Vector2(-0.19f, 0.19f);
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 

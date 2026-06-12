@@ -109,8 +109,8 @@ namespace ClawMachine
             GUILayout.Space(4);
             GUILayout.Label(
                 $"<b>ระยะเยื้องขาซ้าย-ขวา</b>  {s.armOffsetCm:0.0} cm  " +
-                "(ขาขนานแต่ไม่ตรงกัน — shovel สวนกันได้)", Rich());
-            float newOff = GUILayout.HorizontalSlider(s.armOffsetCm, 0f, 4f);
+                "(ขาขนานแต่ไม่ตรงกัน — ติดลบ = สลับฝั่ง)", Rich());
+            float newOff = GUILayout.HorizontalSlider(s.armOffsetCm, -4f, 4f);
             if (!Mathf.Approximately(newOff, s.armOffsetCm)) { s.armOffsetCm = newOff; changed = true; }
 
             // ===== ประเภทตู้ =====
@@ -138,8 +138,8 @@ namespace ClawMachine
             {
                 GUILayout.Space(4);
                 GUILayout.Label(
-                    $"<b>13-2  Sensor bracket</b>  ระยะเลื่อน ±{claw.CurrentTravelLimit:0.00} m " +
-                    "(คำนวณจากขนาดขา+มุมกาง)", Rich());
+                    $"<b>13-2  Sensor bracket</b>  ระยะเลื่อน X ±{claw.CurrentTravelLimit:0.00} / " +
+                    $"Z ±{claw.CurrentTravelLimitZ:0.00} m (คำนวณจากขนาดขา+มุมกาง)", Rich());
             }
 
             // ===== สถานะ =====

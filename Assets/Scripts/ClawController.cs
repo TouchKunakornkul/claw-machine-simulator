@@ -35,13 +35,14 @@ namespace ClawMachine
         [Header("13-2 Sensor bracket (จำกัดพื้นที่เลื่อนตามขนาดขา)")]
         [Tooltip("ถ้า assign settings ขอบเขตจะคำนวณจากความยาวขา+มุมกาง (ขา L = พื้นที่แคบลง)")]
         [SerializeField] private MachineSettings machineSettings;
-        [Tooltip("ครึ่งความกว้างพื้นที่เล่นในตู้ (ถึงผนังกระจก)")]
-        [SerializeField] private float cabinetHalfExtent = 0.30f;
+        [Tooltip("ครึ่งความกว้างพื้นที่เล่นในตู้ถึงผนังกระจก (x=กว้าง, y=ลึก z)")]
+        [SerializeField] private Vector2 cabinetHalfExtent = new Vector2(0.40f, 0.30f);
         [Tooltip("ระยะกันปลายขาเฉี่ยวกระจก")]
         [SerializeField] private float wallClearance = 0.01f;
 
         /// <summary>ขอบเขตเลื่อนปัจจุบัน (สำหรับแสดงบนแผงปรับ)</summary>
         public float CurrentTravelLimit => xLimits.y;
+        public float CurrentTravelLimitZ => zLimits.y;
 
         /// <summary>
         /// 13-2: คำนวณขอบเขตเลื่อนใหม่จากขนาดขา — ปลายขาตอนกางต้องไม่ถึงกระจก
@@ -53,9 +54,10 @@ namespace ClawMachine
             // รัศมีปลายขาตอนกาง — คิดจากเรขาคณิตขาตัว L จริง (ท่อนดิ่ง+ท่อนนอน+shovel)
             float tipReach = ArmGeometry.OpenTipReach(
                 machineSettings.openArmAngle, machineSettings.ArmSizeScale);
-            float limit = Mathf.Max(0.05f, cabinetHalfExtent - tipReach - wallClearance);
-            xLimits = new Vector2(-limit, limit);
-            zLimits = new Vector2(-limit, limit);
+            float xLim = Mathf.Max(0.05f, cabinetHalfExtent.x - tipReach - wallClearance);
+            float zLim = Mathf.Max(0.05f, cabinetHalfExtent.y - tipReach - wallClearance);
+            xLimits = new Vector2(-xLim, xLim);
+            zLimits = new Vector2(-zLim, zLim);
         }
 
         [Header("ตำแหน่งแกน Y (local ของ clawHead)")]
