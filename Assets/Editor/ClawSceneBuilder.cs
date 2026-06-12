@@ -325,7 +325,8 @@ namespace ClawMachine.EditorTools
         private static MachineSettings CreateMachineSettings()
         {
             var s = ScriptableObject.CreateInstance<MachineSettings>();
-            s.power = 55;
+            // ตู้ pink tube จริงตั้ง POWER สูงเกือบ MAX ชดเชยความหนึบของยางคาน
+            s.power = 75;
             s.springStage = MachineSettings.SpringStage.Middle;
             s.armSize = MachineSettings.ArmSize.L; // กล่อง figure 20cm ร้านจริงใช้ขา L
             s.shovel = MachineSettings.ShovelType.W40;
