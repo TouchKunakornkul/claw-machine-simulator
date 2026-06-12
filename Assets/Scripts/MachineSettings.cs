@@ -65,10 +65,13 @@ namespace ClawMachine
         [Tooltip("เฉพาะ kakuritsu: สัดส่วนแรงรอบปกติเทียบแรงเต็ม")]
         [Range(0.05f, 1f)] public float normalGripRatio = 0.15f;
 
-        // ===== ขอบเขตแรง (จูนระดับโปรเจกต์ ไม่ใช่ระดับตู้) =====
-        [Header("ขอบเขตแรง (newtons) — แปลงจาก POWER")]
-        public float minGripForce = 1f;
-        public float maxGripForce = 60f;
+        // ===== ขอบเขตแรงกดปลายขา (N ต่อขา 1 ข้าง) =====
+        // ที่มา (คำนวณจากขอบเขตจริง ไม่ใช่ค่าวัดตรง):
+        // - แรงเต็มต้องถือของ ~1kg ในราง V ~42° ได้: 9.8N×tan42° ≈ 8.8N รวม → max 12N/ขา
+        // - แรงอ่อนสุดต้องถือกล่อง figure 300g ไม่ได้ (ต้องการ ~1.3N/ขา) → min 0.3N
+        [Header("ขอบเขตแรงกดปลายขา (N/ขา) — แปลงจาก POWER 00-99")]
+        public float minGripForce = 0.3f;
+        public float maxGripForce = 12f;
 
         // ---------- ค่าคำนวณ ----------
 

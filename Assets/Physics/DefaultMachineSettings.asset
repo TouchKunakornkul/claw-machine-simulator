@@ -16,7 +16,7 @@ MonoBehaviour:
   springStage: 1
   armSize: 2
   shovel: 1
-  shovelGapCm: 0.5
+  shovelGapCm: 0.1
   openArmAngle: 70
   clawYaw: 0
   armOffsetCm: 1.6

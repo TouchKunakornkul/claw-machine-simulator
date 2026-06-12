@@ -51,6 +51,12 @@ namespace ClawMachine
             return Mathf.Clamp(phi, 2f, 60f);
         }
 
+        /// <summary>รัศมีจาก pivot ถึงปลาย shovel (ใช้แปลงแรงปลายขา -> torque สปริง)</summary>
+        public static float TipRadius(float armScale)
+        {
+            return Mathf.Sqrt(TipIn * TipIn + TipDown * TipDown) * armScale;
+        }
+
         /// <summary>รัศมีปลายขาวัดจากแกนกลางหัว ตอนกาง — ใช้คำนวณ 13-2 sensor bracket</summary>
         public static float OpenTipReach(float openDeg, float armScale)
         {
@@ -97,10 +103,9 @@ namespace ClawMachine
         [SerializeField] private float armMotorSpeed = 120f;
         [Tooltip("สเกลแผ่น shovel เพิ่มเติม (ปรับตามตา ไม่กระทบ W30/40/60)")]
         [SerializeField] private float shovelScale = 1f;
-        [Tooltip("ตัวแปลงแรงหนีบ (N) จาก MachineSettings -> ความแข็งสปริง (N·m/องศา)\n" +
-                 "ต้องเล็กมาก: spring ของ Unity คิดแรงตามองศาที่เบี่ยง — ค่าใหญ่จะแข็งจน" +
-                 "น้ำหนักของง้างขาไม่ออก (POWER ต่ำแล้วของต้องหลุดจริง)")]
-        [SerializeField] private float springPerNewton = 0.0008f;
+        [Tooltip("ระยะเบี่ยง (องศา) ที่สปริงจ่ายแรงเต็มตาม POWER — ใช้แปลงแรงปลายขา (N)\n" +
+                 "เป็นความแข็งสปริง: k = F × รัศมีปลายขา / ค่านี้ (สปริง Unity แรงตามองศาเบี่ยง)")]
+        [SerializeField] private float workingDeflectionDeg = 12f;
 
         [Header("ตรวจสถานะ")]
         [Tooltip("ระยะรอบ grabPoint ที่ถือว่า 'มีของอยู่ในง่าม' (ใช้แสดงผล/หยุดดิ่ง)")]
@@ -177,6 +182,7 @@ namespace ClawMachine
         public float DamperVal { get => springDamper; set { springDamper = value; ReapplyPhase(); } }
         public float ResistanceAngleDeg { get => resistanceAngle; set => resistanceAngle = value; }
         public float ShovelScaleVal { get => shovelScale; set { shovelScale = value; ApplyFromSettings(); } }
+        public float ShovelScoopTiltVal { get => shovelScoopTilt; set { shovelScoopTilt = value; ApplyFromSettings(); } }
         public float ArmMotorSpeedVal { get => armMotorSpeed; set => armMotorSpeed = value; }
         public float LeftHingeAngle => leftHinge != null ? leftHinge.angle : 0f;
         public float RightHingeAngle => rightHinge != null ? rightHinge.angle : 0f;
@@ -205,10 +211,13 @@ namespace ClawMachine
             // 13-5: มุมกางขา (ต้องกางมากกว่ามุมหุบเสมอ)
             openAngle = Mathf.Max(settings.openArmAngle, closedAngle + 8f);
 
-            // 11-1 + 13-3: POWER × ตำแหน่งสปริง × ขนาดขา -> ความแข็งสปริง
-            // POWER ต่ำ = สปริงอ่อนจริงๆ: น้ำหนักกล่อง (~0.06 N·m ที่ปลายขา) ง้างขา
-            // จนแผ่นเอียง ของไถลหลุดตอนยก / POWER สูงถึงจะต้านไหว
-            springStrong = Mathf.Max(0.002f, settings.FullGripForce * springPerNewton);
+            // 11-1 + 13-3: POWER × ตำแหน่งสปริง × ขนาดขา -> แรงปลายขา (N) -> ความแข็งสปริง
+            // หลักกลศาสตร์: torque ที่ปลายขา = F × รัศมี; สปริงต้องจ่าย torque นี้ที่
+            // ระยะเบี่ยงทำงาน (workingDeflection) — กล่อง 300g ในราง V ต้องการ ~1.3N/ขา:
+            // POWER ต่ำ (F < 1.3N) ขาโดนง้างถ่างจนของหลุด / POWER สูงต้านไหว
+            float tipRadius = ArmGeometry.TipRadius(armScale);
+            springStrong = Mathf.Max(0.002f,
+                settings.FullGripForce * tipRadius / Mathf.Max(1f, workingDeflectionDeg));
             springWeak = settings.segaMode
                 ? springStrong // SEGA แท้: แรงคงที่ทุกตา
                 : Mathf.Max(0.001f, springStrong * settings.normalGripRatio);
