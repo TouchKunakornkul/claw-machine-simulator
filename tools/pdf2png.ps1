@@ -2,7 +2,8 @@
 param(
     [string]$PdfPath,
     [string]$Pages,  # 1-based, comma-separated
-    [string]$OutDir
+    [string]$OutDir,
+    [int]$Width = 1400
 )
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 [void][Windows.Data.Pdf.PdfDocument, Windows.Data.Pdf, ContentType = WindowsRuntime]
@@ -39,7 +40,7 @@ foreach ($p in ($Pages -split ',' | ForEach-Object { [int]$_ })) {
     $outPath = Join-Path $OutDir ("page_{0:000}.png" -f $p)
     $stream = New-Object Windows.Storage.Streams.InMemoryRandomAccessStream
     $opts = New-Object Windows.Data.Pdf.PdfPageRenderOptions
-    $opts.DestinationWidth = 1400
+    $opts.DestinationWidth = $Width
     AwaitAction ($page.RenderToStreamAsync($stream, $opts))
     $netStream = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($stream.GetInputStreamAt(0))
     $fs = [System.IO.File]::Create($outPath)

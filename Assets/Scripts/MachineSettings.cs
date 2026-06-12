@@ -41,8 +41,9 @@ namespace ClawMachine
         [Range(0f, 3f)] public float shovelGapCm = 0.5f;
 
         // ===== 13-5: มุมกางขา (เลื่อน sensor bracket ด้าน A = กว้าง / B = แคบ) =====
+        // ขาตัว L ท่อนนอนยาว: เครื่องจริงตอนกางขาบานมาก (~70° จากแนวดิ่ง)
         [Header("มุมกางขา (องศา)")]
-        [Range(20f, 60f)] public float openArmAngle = 50f;
+        [Range(30f, 80f)] public float openArmAngle = 70f;
 
         // ===== ทิศการกางขาเทียบคาน (ไม่มีใน manual — กำหนดโดยการติดตั้ง/รุ่นเครื่อง) =====
         [Header("ทิศการกางขา (หมุนรอบแกนตั้ง) — 0 = กางขนานคาน")]

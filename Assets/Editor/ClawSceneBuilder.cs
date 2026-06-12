@@ -193,13 +193,26 @@ namespace ClawMachine.EditorTools
             var root = new GameObject("Bars").transform;
             float cy = BarTopY - BarDia / 2f;
             var barColor = new Color(0.85f, 0.2f, 0.2f); // คานสีแดงเด่น
-            MakeBar(root, "Bar_Front", new Vector3(0f, cy, -BarZ), barColor);
-            MakeBar(root, "Bar_Back", new Vector3(0f, cy, BarZ), barColor);
+
+            // คานจริงคลุมสายยาง/ท่อยาง = หนึบพอประมาณ — frictionCombine Maximum
+            // เพื่อชนะ Minimum ของกล่อง (กล่องลื่นบน shovel แต่หนึบบนคาน)
+            var rubber = new PhysicsMaterial("BarRubber")
+            {
+                dynamicFriction = 0.65f,
+                staticFriction = 0.75f,
+                bounciness = 0f,
+                frictionCombine = PhysicsMaterialCombine.Maximum,
+                bounceCombine = PhysicsMaterialCombine.Minimum
+            };
+            AssetDatabase.CreateAsset(rubber, "Assets/Physics/BarRubber.physicMaterial");
+
+            MakeBar(root, "Bar_Front", new Vector3(0f, cy, -BarZ), rubber, barColor);
+            MakeBar(root, "Bar_Back", new Vector3(0f, cy, BarZ), rubber, barColor);
         }
 
         // คานกลม: cylinder นอนตามแกน X ยาวชนผนังสองข้าง
-        // ไม่ใส่ low-friction — คานจริงหุ้มยางหนืด กล่องไม่ลื่นไถลง่าย
-        private static void MakeBar(Transform parent, string name, Vector3 pos, Color c)
+        private static void MakeBar(Transform parent, string name, Vector3 pos,
+            PhysicsMaterial rubber, Color c)
         {
             var bar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             bar.name = name;
@@ -208,6 +221,7 @@ namespace ClawMachine.EditorTools
             bar.transform.localScale = new Vector3(BarDia, FieldHalfX, BarDia); // cylinder สูง 2 หน่วย -> ยาวชนผนัง
             bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);  // นอนตามแกน X
             Paint(bar, c);
+            bar.GetComponent<Collider>().sharedMaterial = rubber;
         }
 
         // จุดได้ของ = ใต้ตู้ทั้งหมด (คานเป็นสะพานข้ามหลุม — ร่วงตรงไหนก็ได้รางวัล)
@@ -269,10 +283,10 @@ namespace ClawMachine.EditorTools
             var leftArm = BuildArm("LeftArm", clawHead, mat, -1f, headRb, settings);
             var rightArm = BuildArm("RightArm", clawHead, mat, 1f, headRb, settings);
 
-            // GrabPoint กึ่งกลางปลายขา
+            // GrabPoint กึ่งกลางปลายขา (ขา L ปลายอยู่ลึก ~0.20 ใต้หัว)
             var grabPoint = new GameObject("GrabPoint").transform;
             grabPoint.SetParent(clawHead, false);
-            grabPoint.localPosition = new Vector3(0f, -0.16f, 0f);
+            grabPoint.localPosition = new Vector3(0f, -0.19f, 0f);
 
             // จุดวัด "ของอยู่ใต้หัว" = ก้น hub (ไม่ใช่ปลายขา!) — ขาจะดิ่งลึกจน shovel
             // อยู่ใต้ก้นกล่องก่อนหัวจะแตะของแล้วค่อยหุบ (ช้อนได้จริง)
@@ -293,7 +307,7 @@ namespace ClawMachine.EditorTools
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
             so.FindProperty("holdCheckRadius").floatValue = 0.05f;   // ตรวจว่ามีของในง่าม (HUD)
-            so.FindProperty("resistanceAngle").floatValue = 18f;     // เผื่อขาเฉียด/ครูดตอนคร่อมกล่อง
+            so.FindProperty("resistanceAngle").floatValue = 10f;     // เผื่อขาเฉียด/ครูดตอนคร่อมกล่อง
             so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
             so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -307,9 +321,9 @@ namespace ClawMachine.EditorTools
             var s = ScriptableObject.CreateInstance<MachineSettings>();
             s.power = 55;
             s.springStage = MachineSettings.SpringStage.Middle;
-            s.armSize = MachineSettings.ArmSize.M;
+            s.armSize = MachineSettings.ArmSize.L; // กล่อง figure 20cm ร้านจริงใช้ขา L
             s.shovel = MachineSettings.ShovelType.W40;
-            s.openArmAngle = 55f; // ง่ามกาง ~14cm คร่อมกล่องกว้าง 10cm ได้
+            s.openArmAngle = 70f; // ขาตัว L ท่อนนอนยาว ต้องกางมากถึงคร่อมกล่อง 10cm
             s.shovelGapCm = 0.5f; // 13-4: ปลายเกือบแตะ ไม่ overlap
             s.clawYaw = 0f;       // กางขนานคาน (ปรับทแยงได้ในแผง Tab)
             s.armOffsetCm = 1.6f; // ขาขนานแต่เยื้องกัน — shovel สวนผ่านกันได้ตอนหุบ
@@ -355,8 +369,8 @@ namespace ClawMachine.EditorTools
             spring.damper = 0.05f;
             hinge.spring = spring;
             var limits = hinge.limits;
-            limits.min = -85f;
-            limits.max = 85f;
+            limits.min = -95f;
+            limits.max = 95f;
             hinge.limits = limits;
             hinge.useLimits = true;
 

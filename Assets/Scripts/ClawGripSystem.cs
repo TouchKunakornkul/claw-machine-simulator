@@ -22,8 +22,10 @@ namespace ClawMachine
     /// </summary>
     public static class ArmGeometry
     {
-        public const float ShoulderLen = 0.115f;   // ท่อนดิ่ง: pivot -> ข้อศอก
-        public const float FootLen = 0.05f;        // ท่อนนอน: ข้อศอก -> จุดยึด shovel
+        // สัดส่วนจากรูป ACCESSORIES จริง: ท่อนนอนยาวกว่าท่อนดิ่ง ~1.6 เท่า
+        // (ขาจริงท่อนดิ่งสั้น หักศอกแล้วท่อนนอนยาวยื่นเข้าหากึ่งกลาง)
+        public const float ShoulderLen = 0.065f;   // ท่อนดิ่ง: pivot -> ข้อศอก
+        public const float FootLen = 0.105f;       // ท่อนนอน: ข้อศอก -> จุดยึด shovel
         public const float PlateLen = 0.03f;       // ความยาวแผ่น shovel (ปรับตามสัดส่วนภาพจริง)
         public const float PlateCenterBeyondFoot = 0.008f; // กึ่งกลางแผ่นเลยปลายท่อนนอน
         public const float PivotOut = 0.035f;      // โคนขาห่างกัน 7cm (exploded view 26: ARM SHAFT อยู่ปลายสองข้างของ bracket)
@@ -103,7 +105,7 @@ namespace ClawMachine
         [Tooltip("ระยะรอบ grabPoint ที่ถือว่า 'มีของอยู่ในง่าม' (ใช้แสดงผล/หยุดดิ่ง)")]
         [SerializeField] private float holdCheckRadius = 0.05f;
         [Tooltip("ขาโดนดันจนมุมเบี่ยงจากเป้าเกินนี้ = มีแรงต้านจริง (องศา)")]
-        [SerializeField] private float resistanceAngle = 12f;
+        [SerializeField] private float resistanceAngle = 10f;
         [SerializeField] private Transform grabPoint;
         [SerializeField] private LayerMask prizeLayer = ~0;
 
@@ -332,12 +334,12 @@ namespace ClawMachine
             hinge.spring = s;
             hinge.useSpring = true;
 
-            // stop กลไกแบบเครื่องจริง: ขาโดนง้าง "ออก" ได้ แต่หุบ "เกิน" จุดหุบสุดไม่ได้
+            // stop กลไกแบบเครื่องจริง: ขาโดนง้าง "ออก" ได้ (ถึง 95°) แต่หุบ "เกิน" จุดหุบสุดไม่ได้
             // (สปริงเป็นตัวส่งแรงระหว่างกลไกกับขา ไม่ใช่ขาห้อยแกว่งอิสระ)
             var lim = hinge.limits;
             float stop = closedAngle - 2f;
-            if (outwardSign > 0f) { lim.min = stop; lim.max = 85f; }
-            else { lim.min = -85f; lim.max = -stop; }
+            if (outwardSign > 0f) { lim.min = stop; lim.max = 95f; }
+            else { lim.min = -95f; lim.max = -stop; }
             hinge.limits = lim;
             hinge.useLimits = true;
         }
