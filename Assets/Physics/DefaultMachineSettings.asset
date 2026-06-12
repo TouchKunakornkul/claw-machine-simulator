@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 58be2d6ca08e8bd49abd1f23ef9c1326, type: 3}
   m_Name: DefaultMachineSettings
   m_EditorClassIdentifier: Assembly-CSharp::ClawMachine.MachineSettings
-  power: 55
+  power: 75
   springStage: 1
   armSize: 2
   shovel: 1

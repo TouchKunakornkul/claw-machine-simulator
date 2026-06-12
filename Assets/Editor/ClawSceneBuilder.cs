@@ -359,7 +359,7 @@ namespace ClawMachine.EditorTools
 
             // physics: ขาห้อยจากหัวคีบ แกว่ง/เบนได้รอบแกน Z
             var rb = pivot.gameObject.AddComponent<Rigidbody>();
-            rb.mass = 0.05f;
+            rb.mass = 0.07f; // แถบสแตนเลสพับ ~18x2mm ยาว ~25cm + shovel (ประเมินจาก exploded view)
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 

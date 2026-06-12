@@ -4,7 +4,8 @@
       "Bash(gh auth *)",
       "PowerShell(gh auth status 2>&1)",
       "WebFetch(domain:www.gamesasylum.com)",
-      "WebSearch"
+      "WebSearch",
+      "mcp__unity-mcp__Unity_ManageEditor"
     ]
   }
 }
