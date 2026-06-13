@@ -32,7 +32,7 @@ namespace ClawMachine.EditorTools
 
             BuildLighting();
             BuildCabinet(lowFriction);
-            BuildBars(lowFriction);
+            var barSurface = BuildBars(lowFriction);
             var chute = BuildWinZone();
             var (claw, grip) = BuildClaw(lowFriction);
             var payout = BuildSystems();
@@ -40,7 +40,7 @@ namespace ClawMachine.EditorTools
             SpawnBoxesOnBars(lowFriction, prizeLayer);
 
             WireClawController(claw, grip, payout);
-            WireSystems(claw, grip, payout, chute, frontCam, sideCam);
+            WireSystems(claw, grip, payout, chute, frontCam, sideCam, barSurface);
 
             // save
             Directory.CreateDirectory("Assets/Scenes");
@@ -190,17 +190,19 @@ namespace ClawMachine.EditorTools
         private const float BarTopY = 0.30f;    // ผิวบนคาน — ยกสูงให้เห็นกล่องร่วงเต็มตา
         private const float GapHalfZ = BarZ - BarDia / 2f; // ขอบในคู่กลาง (ช่องใน 12cm)
 
-        private static void BuildBars(PhysicsMaterial mat)
+        private static BarSurface BuildBars(PhysicsMaterial mat)
         {
             var root = new GameObject("Bars").transform;
             float cy = BarTopY - BarDia / 2f;
 
-            // pink tube จริง: ยางหนึบสวมเฉพาะคู่กลางที่รับกล่อง — frictionCombine Maximum
-            // เพื่อชนะ Minimum ของกล่อง (กล่องลื่นบน shovel แต่หนึบบนคาน)
+            // ปลอกคานคู่กลาง (ค่าตามตัวเลือกใน MachineSettings: ไม่มี/ใส/pink tube)
+            // frictionCombine Maximum เพื่อชนะ Minimum ของกล่อง
+            // (กล่องลื่นบน shovel แต่หนึบบนคานตามปลอก) — BarSurface ปรับสดได้ตอน runtime
+            var settings = AssetDatabase.LoadAssetAtPath<MachineSettings>(SettingsPath);
             var rubber = new PhysicsMaterial("BarRubber")
             {
-                dynamicFriction = 0.65f,
-                staticFriction = 0.75f,
+                dynamicFriction = settings != null ? settings.BarDynamicFriction : 0.45f,
+                staticFriction = settings != null ? settings.BarStaticFriction : 0.55f,
                 bounciness = 0f,
                 frictionCombine = PhysicsMaterialCombine.Maximum,
                 bounceCombine = PhysicsMaterialCombine.Minimum
@@ -210,14 +212,30 @@ namespace ClawMachine.EditorTools
             var pink = new Color(0.95f, 0.45f, 0.65f);   // pink tube
             var chrome = new Color(0.75f, 0.75f, 0.78f); // ราวโลหะเปล่า
 
-            MakeBar(root, "Bar_Mid_Front", new Vector3(0f, cy, -BarZ), rubber, pink);
-            MakeBar(root, "Bar_Mid_Back", new Vector3(0f, cy, BarZ), rubber, pink);
+            var midF = MakeBar(root, "Bar_Mid_Front", new Vector3(0f, cy, -BarZ), rubber, pink);
+            var midB = MakeBar(root, "Bar_Mid_Back", new Vector3(0f, cy, BarZ), rubber, pink);
             MakeBar(root, "Bar_Outer_Front", new Vector3(0f, cy, -OuterBarZ), null, chrome);
             MakeBar(root, "Bar_Outer_Back", new Vector3(0f, cy, OuterBarZ), null, chrome);
+
+            // ตัวจัดการปลอกคานคู่กลาง (ปรับ friction/สีสดจากแผง Tab)
+            var surface = root.gameObject.AddComponent<BarSurface>();
+            var bso = new SerializedObject(surface);
+            bso.FindProperty("settings").objectReferenceValue = settings;
+            var bars = bso.FindProperty("coveredBars");
+            bars.arraySize = 2;
+            bars.GetArrayElementAtIndex(0).objectReferenceValue = midF.GetComponent<Collider>();
+            bars.GetArrayElementAtIndex(1).objectReferenceValue = midB.GetComponent<Collider>();
+            var rends = bso.FindProperty("coveredRenderers");
+            rends.arraySize = 2;
+            rends.GetArrayElementAtIndex(0).objectReferenceValue = midF.GetComponent<Renderer>();
+            rends.GetArrayElementAtIndex(1).objectReferenceValue = midB.GetComponent<Renderer>();
+            bso.ApplyModifiedPropertiesWithoutUndo();
+
+            return surface;
         }
 
         // คานกลม: cylinder นอนตามแกน X ยาวชนผนังสองข้าง
-        private static void MakeBar(Transform parent, string name, Vector3 pos,
+        private static GameObject MakeBar(Transform parent, string name, Vector3 pos,
             PhysicsMaterial barMat, Color c)
         {
             var bar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -228,6 +246,7 @@ namespace ClawMachine.EditorTools
             bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);  // นอนตามแกน X
             Paint(bar, c);
             if (barMat != null) bar.GetComponent<Collider>().sharedMaterial = barMat;
+            return bar;
         }
 
         // จุดได้ของ = ใต้ตู้ทั้งหมด (คานเป็นสะพานข้ามหลุม — ร่วงตรงไหนก็ได้รางวัล)
@@ -527,7 +546,7 @@ namespace ClawMachine.EditorTools
         }
 
         private static void WireSystems(ClawController claw, ClawGripSystem grip, PayoutManager payout,
-            PrizeCatchZone chute, Camera front, Camera side)
+            PrizeCatchZone chute, Camera front, Camera side, BarSurface barSurface)
         {
             var systems = payout.gameObject;
 
@@ -557,6 +576,7 @@ namespace ClawMachine.EditorTools
             pso.FindProperty("grip").objectReferenceValue = grip;
             pso.FindProperty("claw").objectReferenceValue = claw;
             pso.FindProperty("payout").objectReferenceValue = payout;
+            pso.FindProperty("barSurface").objectReferenceValue = barSurface;
             pso.ApplyModifiedPropertiesWithoutUndo();
         }
 

@@ -57,6 +57,22 @@ namespace ClawMachine
         [Header("ระยะเยื้องขาซ้าย-ขวา (cm) — ขาขนานกันแต่เยื้องกันเหมือนเครื่องจริง")]
         [Range(-4f, 4f)] public float armOffsetCm = 1.6f;
 
+        // ===== ปลอกคานคู่กลาง (การจัดตู้ hashi-watashi) =====
+        // research (grabbit/90N): ไม่มีปลอก = ลื่นสุด (ง่าย) / ปลอกใส = ลื่นกว่า /
+        // pink tube = หนึบสุด (ร้านชดเชยด้วย POWER เกือบ MAX)
+        public enum BarCover { Bare, ClearTube, PinkTube }
+        [Header("ปลอกคานคู่กลาง")]
+        public BarCover barCover = BarCover.PinkTube;
+
+        /// <summary>แรงเสียดทานสถิตของผิวคานตามปลอก (กระดาษกล่องบนยาง ~0.5)</summary>
+        public float BarStaticFriction =>
+            barCover == BarCover.Bare ? 0.25f :
+            barCover == BarCover.ClearTube ? 0.40f : 0.55f;
+
+        public float BarDynamicFriction =>
+            barCover == BarCover.Bare ? 0.20f :
+            barCover == BarCover.ClearTube ? 0.32f : 0.45f;
+
         // ===== โหมดจ่ายรางวัล =====
         [Header("โหมดจ่ายรางวัล")]
         [Tooltip("SEGA แท้ = แรงคงที่ทุกตา (สู้ด้วยการจัดวาง) / Kakuritsu = อ่อนปกติ แรงเมื่อถึงรอบจ่าย")]

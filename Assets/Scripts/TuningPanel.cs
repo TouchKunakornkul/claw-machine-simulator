@@ -15,6 +15,7 @@ namespace ClawMachine
         [SerializeField] private ClawGripSystem grip;
         [SerializeField] private ClawController claw;
         [SerializeField] private PayoutManager payout;
+        [SerializeField] private BarSurface barSurface;
         [SerializeField] private KeyCode toggleKey = KeyCode.Tab;
 
         private bool visible;
@@ -112,6 +113,18 @@ namespace ClawMachine
                 "(ขาขนานแต่ไม่ตรงกัน — ติดลบ = สลับฝั่ง)", Rich());
             float newOff = GUILayout.HorizontalSlider(s.armOffsetCm, -4f, 4f);
             if (!Mathf.Approximately(newOff, s.armOffsetCm)) { s.armOffsetCm = newOff; changed = true; }
+
+            // ===== ปลอกคานคู่กลาง (การจัดตู้) =====
+            GUILayout.Space(8);
+            GUILayout.Label("<b>ปลอกคานคู่กลาง</b>  (ยิ่งหนึบยิ่งยาก)", Rich());
+            var cover = (MachineSettings.BarCover)Toolbar((int)s.barCover,
+                new[] { "ไม่มีปลอก\n(ลื่น/ง่าย)", "ปลอกใส", "Pink tube\n(หนึบ/ยาก)" });
+            if (cover != s.barCover)
+            {
+                s.barCover = cover;
+                changed = true;
+                if (barSurface != null) barSurface.ApplyFromSettings();
+            }
 
             // ===== ประเภทตู้ =====
             GUILayout.Space(8);

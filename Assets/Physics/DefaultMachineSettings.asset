@@ -20,6 +20,7 @@ MonoBehaviour:
   openArmAngle: 80
   clawYaw: 0
   armOffsetCm: 1.6
+  barCover: 2
   segaMode: 1
   payoutEveryN: 12
   normalGripRatio: 0.15
