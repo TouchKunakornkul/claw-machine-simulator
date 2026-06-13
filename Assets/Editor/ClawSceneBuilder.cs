@@ -240,7 +240,13 @@ namespace ClawMachine.EditorTools
             bar.transform.localScale = new Vector3(BarDia, FieldHalfX, BarDia); // cylinder สูง 2 หน่วย -> ยาวชนผนัง
             bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);  // นอนตามแกน X
             Paint(bar, c);
-            if (barMat != null) bar.GetComponent<Collider>().sharedMaterial = barMat;
+            // Cylinder primitive ให้ MeshCollider (non-convex) มาซึ่งทนการชนแย่ + กล่องทะลุได้
+            // เปลี่ยนเป็น CapsuleCollider (convex) ทรงเดียวกับคานกลม -> ชนแม่น ไม่ทะลุ
+            Object.DestroyImmediate(bar.GetComponent<Collider>());
+            var cap = bar.AddComponent<CapsuleCollider>();
+            cap.direction = 1; // แกน Y (local) = แกนยาวคานหลังหมุน
+            cap.radius = 0.5f; cap.height = 2f; // หน่วย mesh-local (โดน scale เป็น 2.5cm dia)
+            if (barMat != null) cap.sharedMaterial = barMat;
             return bar;
         }
 
@@ -470,14 +476,18 @@ namespace ClawMachine.EditorTools
             return pivot;
         }
 
+        // ขา = แถบแบน: ใช้ capsule เป็น "ภาพ" แต่ collider เป็น BoxCollider พอดีแถบ
+        // (CapsuleCollider เอารัศมี = max(scale x,z) -> บวมด้านบางจนชนทั้งที่ยังไม่แตะ)
         private static Transform MakeCapsule(string name, Transform parent, PhysicsMaterial mat, Color c)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             go.name = name;
             go.transform.SetParent(parent, false);
             Paint(go, c);
-            var col = go.GetComponent<CapsuleCollider>();
-            if (mat != null && col != null) col.sharedMaterial = mat;
+            Object.DestroyImmediate(go.GetComponent<CapsuleCollider>());
+            var box = go.AddComponent<BoxCollider>();
+            box.size = new Vector3(1f, 2f, 1f); // capsule mesh สูง 2 หน่วย -> ครอบพอดีแถบ
+            if (mat != null) box.sharedMaterial = mat;
             return go.transform;
         }
 
