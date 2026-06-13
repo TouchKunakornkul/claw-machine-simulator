@@ -7,7 +7,15 @@
       "WebSearch",
       "mcp__unity-mcp__Unity_ManageEditor",
       "mcp__unity-mcp__Unity_GetConsoleLogs",
-      "WebFetch(domain:grabbit.co.jp)"
+      "WebFetch(domain:grabbit.co.jp)",
+      "Bash(cd \"/c/Users/Touch/Claude/Projects/claw machine simulator\" && PKG=\"Library/PackageCache/com.unity.ai.assistant@cf5457e9fac0\" && echo \"=== Bridge.cs 1120-1170 \\(validation -> Denied path\\) ===\" && sed -n '1120,1170p' \"$PKG/Modules/Unity.AI.MCP.Editor/Bridge.cs\")",
+      "WebFetch(domain:coplaydev.github.io)",
+      "mcp__UnityMCP__manage_camera",
+      "mcp__UnityMCP__manage_editor",
+      "mcp__UnityMCP__refresh_unity",
+      "mcp__UnityMCP__read_console",
+      "mcp__UnityMCP__execute_menu_item",
+      "mcp__UnityMCP__execute_code"
     ]
   }
 }

@@ -48,14 +48,8 @@ namespace ClawMachine.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[ClawSceneBuilder] สร้าง scene hashi-watashi เสร็จ: " + ScenePath);
-            EditorUtility.DisplayDialog("Claw Machine — Hashi-watashi",
-                "สร้าง scene คานขนานเสร็จแล้ว!\n\n" +
-                "เป้าหมาย: ดันกล่องให้หมุนจนร่วงลงระหว่างคาน\n\n" +
-                "Arrows = เลื่อน  Space = ดิ่งคีบ\n" +
-                "C = สลับกล้อง  P = บังคับ payout\n\n" +
-                "เคล็ดลับ: เล็งที่มุมกล่อง (กล่องขวาเอียงเกือบขนาน = ง่ายสุด)",
-                "OK");
+            Debug.Log("[ClawSceneBuilder] สร้าง scene hashi-watashi เสร็จ: " + ScenePath +
+                "  | Arrows=เลื่อน Space=ดิ่งคีบ C=สลับกล้อง P=payout");
         }
 
         // ---------- Project settings ----------
@@ -283,8 +277,8 @@ namespace ClawMachine.EditorTools
             var crown = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             crown.name = "CrownCover";
             crown.transform.SetParent(clawHead, false);
-            crown.transform.localScale = new Vector3(0.18f, 0.11f, 0.18f); // โดมครอบลึก
-            crown.transform.localPosition = new Vector3(0f, 0.02f, 0f);
+            crown.transform.localScale = new Vector3(0.19f, 0.055f, 0.19f); // จานบินแบน (ไม่ใช่ลูกบอล)
+            crown.transform.localPosition = new Vector3(0f, 0.012f, 0f);
             Paint(crown, new Color(0.9f, 0.78f, 0.25f)); // เหลืองทอง
             Object.DestroyImmediate(crown.GetComponent<Collider>()); // sphere collider ใหญ่ไป ใช้ pad แทน
 

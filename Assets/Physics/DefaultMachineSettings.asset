@@ -17,6 +17,7 @@ MonoBehaviour:
   armSize: 2
   shovel: 1
   shovelGapCm: 1.5
+  pushForceKnob: 14
   openArmAngle: 80
   clawYaw: 0
   armOffsetCm: 1.6
