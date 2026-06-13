@@ -66,12 +66,12 @@ namespace ClawMachine
 
         /// <summary>แรงเสียดทานสถิตของผิวคานตามปลอก (กระดาษกล่องบนยาง ~0.5)</summary>
         public float BarStaticFriction =>
-            barCover == BarCover.Bare ? 0.25f :
-            barCover == BarCover.ClearTube ? 0.40f : 0.55f;
+            barCover == BarCover.Bare ? 0.18f :
+            barCover == BarCover.ClearTube ? 0.32f : 0.48f;
 
         public float BarDynamicFriction =>
-            barCover == BarCover.Bare ? 0.20f :
-            barCover == BarCover.ClearTube ? 0.32f : 0.45f;
+            barCover == BarCover.Bare ? 0.12f :
+            barCover == BarCover.ClearTube ? 0.24f : 0.38f;
 
         // ===== โหมดจ่ายรางวัล =====
         [Header("โหมดจ่ายรางวัล")]

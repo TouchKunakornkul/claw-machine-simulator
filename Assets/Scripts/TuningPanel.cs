@@ -20,7 +20,8 @@ namespace ClawMachine
 
         private bool visible;
         private bool advanced;
-        private Rect winRect = new Rect(20, 20, 400, 620);
+        private Rect winRect = new Rect(20, 20, 400, 560);
+        private Vector2 scroll;
 
         private void Update()
         {
@@ -42,15 +43,20 @@ namespace ClawMachine
         private void DrawWindow(int id)
         {
             var s = grip != null ? grip.Settings : null;
-            GUILayout.BeginVertical();
+
+            // แถบหัวสำหรับลากหน้าต่าง (ต้องอยู่นอก ScrollView ไม่งั้น scroll ไม่ทำงาน)
+            GUI.DragWindow(new Rect(0, 0, winRect.width, 20));
 
             if (s == null)
             {
+                GUILayout.Space(22);
                 GUILayout.Label("(ไม่มี MachineSettings asset — rebuild scene ก่อน)");
-                GUILayout.EndVertical();
-                GUI.DragWindow();
                 return;
             }
+
+            GUILayout.Space(20);
+            scroll = GUILayout.BeginScrollView(scroll);
+            GUILayout.BeginVertical();
 
             bool changed = false;
 
@@ -188,7 +194,7 @@ namespace ClawMachine
             }
 
             GUILayout.EndVertical();
-            GUI.DragWindow();
+            GUILayout.EndScrollView();
         }
 
         private int Toolbar(int selected, string[] labels)

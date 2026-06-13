@@ -204,7 +204,8 @@ namespace ClawMachine.EditorTools
                 dynamicFriction = settings != null ? settings.BarDynamicFriction : 0.45f,
                 staticFriction = settings != null ? settings.BarStaticFriction : 0.55f,
                 bounciness = 0f,
-                frictionCombine = PhysicsMaterialCombine.Maximum,
+                // Average (ไม่ใช่ Maximum) — กล่องยังไถล/หมุนได้ตามจริง ไม่ถูกตรึงค้าง
+                frictionCombine = PhysicsMaterialCombine.Average,
                 bounceCombine = PhysicsMaterialCombine.Minimum
             };
             AssetDatabase.CreateAsset(rubber, "Assets/Physics/BarRubber.physicMaterial");
@@ -277,22 +278,32 @@ namespace ClawMachine.EditorTools
             clawHead.SetParent(gantry, false);
             clawHead.localPosition = Vector3.zero;
 
-            // ลำตัวหัวคีบ = จานครอบ (saucer) แบบ UFO catcher — เครื่องจริงหัวใหญ่ Ø ~20cm
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            body.name = "HeadBody";
-            body.transform.SetParent(clawHead, false);
-            body.transform.localScale = new Vector3(0.20f, 0.035f, 0.20f); // แบนเป็นจาน
-            body.transform.localPosition = new Vector3(0f, 0.02f, 0f);
-            Paint(body, new Color(0.85f, 0.7f, 0.2f));
-            Object.DestroyImmediate(body.GetComponent<Collider>());
+            // โครงสร้างหัวจริง: กลไกเล็ก + "crown" ฝาครอบโดมครอบไว้ (ที่เห็นใหญ่คือฝา ไม่ใช่มอเตอร์)
+            // ฝาครอบโดม (UFO COVER) — ทรงโดมแบนครอบกลไก Ø ~17cm
+            var crown = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            crown.name = "CrownCover";
+            crown.transform.SetParent(clawHead, false);
+            crown.transform.localScale = new Vector3(0.17f, 0.09f, 0.17f); // โดมแบน
+            crown.transform.localPosition = new Vector3(0f, 0.035f, 0f);
+            Paint(crown, new Color(0.9f, 0.78f, 0.25f)); // เหลืองทอง
+            Object.DestroyImmediate(crown.GetComponent<Collider>());
 
-            // แกนกลางเชื่อมขา (mechanism กล่องใต้จาน)
+            // วงแหวนฐานครอบ (saucer rim) ใต้โดม
+            var rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            rim.name = "CrownRim";
+            rim.transform.SetParent(clawHead, false);
+            rim.transform.localScale = new Vector3(0.13f, 0.012f, 0.13f);
+            rim.transform.localPosition = new Vector3(0f, 0.01f, 0f);
+            Paint(rim, new Color(0.7f, 0.6f, 0.2f));
+            Object.DestroyImmediate(rim.GetComponent<Collider>());
+
+            // กลไกจริง (กล่องเล็กใต้ครอบ ที่ขายึด) — เล็กกว่าฝาครอบมาก
             var hub = GameObject.CreatePrimitive(PrimitiveType.Cube);
             hub.name = "Hub";
             hub.transform.SetParent(clawHead, false);
-            hub.transform.localScale = new Vector3(0.07f, 0.05f, 0.05f);
-            hub.transform.localPosition = new Vector3(0f, -0.025f, 0f);
-            Paint(hub, new Color(0.3f, 0.3f, 0.33f));
+            hub.transform.localScale = new Vector3(0.05f, 0.035f, 0.035f);
+            hub.transform.localPosition = new Vector3(0f, -0.02f, 0f);
+            Paint(hub, new Color(0.28f, 0.28f, 0.3f));
             Object.DestroyImmediate(hub.GetComponent<Collider>());
 
             var grip = clawHead.gameObject.AddComponent<ClawGripSystem>();
@@ -350,7 +361,7 @@ namespace ClawMachine.EditorTools
             s.armSize = MachineSettings.ArmSize.L; // กล่อง figure 20cm ร้านจริงใช้ขา L
             s.shovel = MachineSettings.ShovelType.W40;
             s.openArmAngle = 80f; // กางเต็มมาตรฐาน: ปลายเล็บถึงระดับข้อศอก (ง่ามกว้าง ~20cm)
-            s.shovelGapCm = 0.1f; // สเปคจริงจาก exploded view: 1±1 mm
+            s.shovelGapCm = 1.5f; // ตั้งให้ปลายขาเหลือช่องเห็นชัด (ปรับ 0-3cm ในแผง 13-4)
             s.clawYaw = 0f;       // กางขนานคาน (ปรับทแยงได้ในแผง Tab)
             s.armOffsetCm = 1.6f; // ขาขนานแต่เยื้องกัน — shovel สวนผ่านกันได้ตอนหุบ
             s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
@@ -400,14 +411,14 @@ namespace ClawMachine.EditorTools
             hinge.limits = limits;
             hinge.useLimits = true;
 
-            // ท่อนดิ่ง (shoulder): จาก pivot ตรงลงข้อศอก
+            // ท่อนดิ่ง (shoulder): จาก pivot ตรงลงข้อศอก — แถบสแตนเลสบาง (ไม่ใช่ท่อหนา)
             var shoulder = MakeCapsule(name + "_Shoulder", pivot, mat, metal);
-            shoulder.localScale = new Vector3(0.016f, ArmGeometry.ShoulderLen / 2f, 0.012f);
+            shoulder.localScale = new Vector3(0.009f, ArmGeometry.ShoulderLen / 2f, 0.018f);
             shoulder.localPosition = new Vector3(0f, -ArmGeometry.ShoulderLen / 2f, 0f);
 
             // ท่อนนอน (foot): หักศอก ~90° ยื่นเข้าหากึ่งกลาง
             var foot = MakeCapsule(name + "_Foot", pivot, mat, metal);
-            foot.localScale = new Vector3(0.014f, ArmGeometry.FootLen / 2f, 0.012f);
+            foot.localScale = new Vector3(0.008f, ArmGeometry.FootLen / 2f, 0.018f);
             foot.localPosition = new Vector3(
                 inwardSign * ArmGeometry.FootLen / 2f, -ArmGeometry.ShoulderLen, 0f);
             foot.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 90f);
