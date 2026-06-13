@@ -12,15 +12,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 58be2d6ca08e8bd49abd1f23ef9c1326, type: 3}
   m_Name: DefaultMachineSettings
   m_EditorClassIdentifier: Assembly-CSharp::ClawMachine.MachineSettings
-  power: 55
+  power: 75
   springStage: 1
-  armSize: 1
+  armSize: 2
   shovel: 1
-  shovelGapCm: 0.5
-  openArmAngle: 50
-  clawYaw: 45
+  shovelGapCm: 1.5
+  pushForceKnob: 14
+  openArmAngle: 80
+  clawYaw: 0
+  armOffsetCm: 1.6
+  barCover: 2
   segaMode: 1
   payoutEveryN: 12
   normalGripRatio: 0.15
-  minGripForce: 1
-  maxGripForce: 60
+  minGripForce: 0.3
+  maxGripForce: 12

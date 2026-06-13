@@ -4,7 +4,21 @@
       "Bash(gh auth *)",
       "PowerShell(gh auth status 2>&1)",
       "WebFetch(domain:www.gamesasylum.com)",
-      "WebSearch"
+      "WebSearch",
+      "mcp__unity-mcp__Unity_ManageEditor",
+      "mcp__unity-mcp__Unity_GetConsoleLogs",
+      "WebFetch(domain:grabbit.co.jp)",
+      "Bash(cd \"/c/Users/Touch/Claude/Projects/claw machine simulator\" && PKG=\"Library/PackageCache/com.unity.ai.assistant@cf5457e9fac0\" && echo \"=== Bridge.cs 1120-1170 \\(validation -> Denied path\\) ===\" && sed -n '1120,1170p' \"$PKG/Modules/Unity.AI.MCP.Editor/Bridge.cs\")",
+      "WebFetch(domain:coplaydev.github.io)",
+      "mcp__UnityMCP__manage_camera",
+      "mcp__UnityMCP__manage_editor",
+      "mcp__UnityMCP__refresh_unity",
+      "mcp__UnityMCP__read_console",
+      "mcp__UnityMCP__execute_menu_item",
+      "mcp__UnityMCP__execute_code",
+      "WebFetch(domain:www.sega.jp)",
+      "PowerShell(powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Touch\\\\Claude\\\\Projects\\\\claw machine simulator\\\\tools\\\\pdf2png.ps1\" -PdfPath \"C:\\\\Users\\\\Touch\\\\Downloads\\\\SegaUFOCatcher_Manual.pdf\" -Pages \"11,39\" -OutDir \"$env:TEMP\\\\sega_ref\" -Width 2400; \"done\")",
+      "PowerShell(Add-Type -AssemblyName System.Drawing; $src = [System.Drawing.Bitmap]::FromFile\\(\"$env:TEMP\\\\sega_ref\\\\page_011.png\"\\); \"size: $\\($src.Width\\)x$\\($src.Height\\)\"; $rect = New-Object System.Drawing.Rectangle 300, 600, 1800, 900; $crop = $src.Clone\\($rect, $src.PixelFormat\\); $crop.Save\\(\"$env:TEMP\\\\sega_ref\\\\cabinet_heads.png\"\\); $src.Dispose\\(\\); $crop.Dispose\\(\\); \"ok\")"
     ]
   }
 }

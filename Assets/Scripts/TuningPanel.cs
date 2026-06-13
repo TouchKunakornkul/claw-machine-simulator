@@ -15,11 +15,13 @@ namespace ClawMachine
         [SerializeField] private ClawGripSystem grip;
         [SerializeField] private ClawController claw;
         [SerializeField] private PayoutManager payout;
+        [SerializeField] private BarSurface barSurface;
         [SerializeField] private KeyCode toggleKey = KeyCode.Tab;
 
         private bool visible;
         private bool advanced;
-        private Rect winRect = new Rect(20, 20, 400, 620);
+        private Rect winRect = new Rect(20, 20, 400, 560);
+        private Vector2 scroll;
 
         private void Update()
         {
@@ -41,15 +43,20 @@ namespace ClawMachine
         private void DrawWindow(int id)
         {
             var s = grip != null ? grip.Settings : null;
-            GUILayout.BeginVertical();
+
+            // แถบหัวสำหรับลากหน้าต่าง (ต้องอยู่นอก ScrollView ไม่งั้น scroll ไม่ทำงาน)
+            GUI.DragWindow(new Rect(0, 0, winRect.width, 20));
 
             if (s == null)
             {
+                GUILayout.Space(22);
                 GUILayout.Label("(ไม่มี MachineSettings asset — rebuild scene ก่อน)");
-                GUILayout.EndVertical();
-                GUI.DragWindow();
                 return;
             }
+
+            GUILayout.Space(20);
+            scroll = GUILayout.BeginScrollView(scroll);
+            GUILayout.BeginVertical();
 
             bool changed = false;
 
@@ -83,10 +90,17 @@ namespace ClawMachine
             float newGap = GUILayout.HorizontalSlider(s.shovelGapCm, 0f, 3f);
             if (!Mathf.Approximately(newGap, s.shovelGapCm)) { s.shovelGapCm = newGap; changed = true; }
 
+            // ===== สกรูเงิน UFO9: แรงดันลงก่อนหยุด =====
+            GUILayout.Space(8);
+            GUILayout.Label($"<b>สกรูเงิน (UFO9) แรงดันลงก่อนหยุด</b>  {s.pushForceKnob:0}°", Rich());
+            GUILayout.Label("น้อย = เซนเซอร์ไว ดันเบา หยุดเร็ว / มาก = ดันแรงกว่าก่อนหยุด");
+            float newPush = GUILayout.HorizontalSlider(s.pushForceKnob, 4f, 40f);
+            if (!Mathf.Approximately(newPush, s.pushForceKnob)) { s.pushForceKnob = newPush; changed = true; }
+
             // ===== 13-5: มุมกางขา =====
             GUILayout.Space(8);
             GUILayout.Label($"<b>13-5  มุมกางขา</b>  {s.openArmAngle:0}°  (เลื่อน A=กว้าง / B=แคบ)", Rich());
-            float newOpen = GUILayout.HorizontalSlider(s.openArmAngle, 20f, 60f);
+            float newOpen = GUILayout.HorizontalSlider(s.openArmAngle, 40f, 88f);
             if (!Mathf.Approximately(newOpen, s.openArmAngle)) { s.openArmAngle = newOpen; changed = true; }
 
             // ===== ทิศการกางขาเทียบคาน (การติดตั้ง — ไม่มีใน manual) =====
@@ -104,6 +118,26 @@ namespace ClawMachine
             }
             float newYaw = GUILayout.HorizontalSlider(s.clawYaw, 0f, 90f);
             if (!Mathf.Approximately(newYaw, s.clawYaw)) { s.clawYaw = newYaw; changed = true; }
+
+            // ===== ระยะเยื้องขา (ดีไซน์ hub — ขาขนานกันแต่ไม่ตรงกัน) =====
+            GUILayout.Space(4);
+            GUILayout.Label(
+                $"<b>ระยะเยื้องขาซ้าย-ขวา</b>  {s.armOffsetCm:0.0} cm  " +
+                "(ขาขนานแต่ไม่ตรงกัน — ติดลบ = สลับฝั่ง)", Rich());
+            float newOff = GUILayout.HorizontalSlider(s.armOffsetCm, -4f, 4f);
+            if (!Mathf.Approximately(newOff, s.armOffsetCm)) { s.armOffsetCm = newOff; changed = true; }
+
+            // ===== ปลอกคานคู่กลาง (การจัดตู้) =====
+            GUILayout.Space(8);
+            GUILayout.Label("<b>ปลอกคานคู่กลาง</b>  (ยิ่งหนึบยิ่งยาก)", Rich());
+            var cover = (MachineSettings.BarCover)Toolbar((int)s.barCover,
+                new[] { "ไม่มีปลอก\n(ลื่น/ง่าย)", "ปลอกใส", "Pink tube\n(หนึบ/ยาก)" });
+            if (cover != s.barCover)
+            {
+                s.barCover = cover;
+                changed = true;
+                if (barSurface != null) barSurface.ApplyFromSettings();
+            }
 
             // ===== ประเภทตู้ =====
             GUILayout.Space(8);
@@ -130,8 +164,8 @@ namespace ClawMachine
             {
                 GUILayout.Space(4);
                 GUILayout.Label(
-                    $"<b>13-2  Sensor bracket</b>  ระยะเลื่อน ±{claw.CurrentTravelLimit:0.00} m " +
-                    "(คำนวณจากขนาดขา+มุมกาง)", Rich());
+                    $"<b>13-2  Sensor bracket</b>  ระยะเลื่อน X ±{claw.CurrentTravelLimit:0.00} / " +
+                    $"Z ±{claw.CurrentTravelLimitZ:0.00} m (คำนวณจากขนาดขา+มุมกาง)", Rich());
             }
 
             // ===== สถานะ =====
@@ -150,7 +184,12 @@ namespace ClawMachine
             {
                 grip.SpringOpenVal = Slider($"สปริงตอนกาง: {grip.SpringOpenVal:0.00}", grip.SpringOpenVal, 0.05f, 3f);
                 grip.DamperVal = Slider($"Damper: {grip.DamperVal:0.000}", grip.DamperVal, 0.005f, 0.5f);
-                grip.ResistanceAngleDeg = Slider($"มุมต้านหยุดดิ่ง: {grip.ResistanceAngleDeg:0}°", grip.ResistanceAngleDeg, 5f, 35f);
+                grip.ArmMotorSpeedVal = Slider($"ความเร็วมอเตอร์กาง/หุบ: {grip.ArmMotorSpeedVal:0}°/s", grip.ArmMotorSpeedVal, 30f, 360f);
+                float newShovelScale = Slider($"สเกล shovel (ตามตา): {grip.ShovelScaleVal:0.00}", grip.ShovelScaleVal, 0.5f, 1.5f);
+                if (!Mathf.Approximately(newShovelScale, grip.ShovelScaleVal)) grip.ShovelScaleVal = newShovelScale;
+                // มุม V ของหน้า shovel ตอนหุบ — วัดจากรูป manual ≈ 6° (0 = ราบสนิท)
+                float newTilt = Slider($"มุม V หน้า shovel ตอนหุบ: {grip.ShovelScoopTiltVal:0}° (วัดจริง ~6)", grip.ShovelScoopTiltVal, 0f, 30f);
+                if (!Mathf.Approximately(newTilt, grip.ShovelScoopTiltVal)) grip.ShovelScoopTiltVal = newTilt;
                 if (claw != null)
                 {
                     claw.DescentSpeedVal = Slider($"ความเร็วดิ่ง: {claw.DescentSpeedVal:0.00} m/s", claw.DescentSpeedVal, 0.05f, 0.4f);
@@ -161,7 +200,7 @@ namespace ClawMachine
             }
 
             GUILayout.EndVertical();
-            GUI.DragWindow();
+            GUILayout.EndScrollView();
         }
 
         private int Toolbar(int selected, string[] labels)

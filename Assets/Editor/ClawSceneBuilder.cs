@@ -32,7 +32,7 @@ namespace ClawMachine.EditorTools
 
             BuildLighting();
             BuildCabinet(lowFriction);
-            BuildBars(lowFriction);
+            var barSurface = BuildBars(lowFriction);
             var chute = BuildWinZone();
             var (claw, grip) = BuildClaw(lowFriction);
             var payout = BuildSystems();
@@ -40,7 +40,7 @@ namespace ClawMachine.EditorTools
             SpawnBoxesOnBars(lowFriction, prizeLayer);
 
             WireClawController(claw, grip, payout);
-            WireSystems(claw, grip, payout, chute, frontCam, sideCam);
+            WireSystems(claw, grip, payout, chute, frontCam, sideCam, barSurface);
 
             // save
             Directory.CreateDirectory("Assets/Scenes");
@@ -48,14 +48,8 @@ namespace ClawMachine.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[ClawSceneBuilder] สร้าง scene hashi-watashi เสร็จ: " + ScenePath);
-            EditorUtility.DisplayDialog("Claw Machine — Hashi-watashi",
-                "สร้าง scene คานขนานเสร็จแล้ว!\n\n" +
-                "เป้าหมาย: ดันกล่องให้หมุนจนร่วงลงระหว่างคาน\n\n" +
-                "Arrows = เลื่อน  Space = ดิ่งคีบ\n" +
-                "C = สลับกล้อง  P = บังคับ payout\n\n" +
-                "เคล็ดลับ: เล็งที่มุมกล่อง (กล่องขวาเอียงเกือบขนาน = ง่ายสุด)",
-                "OK");
+            Debug.Log("[ClawSceneBuilder] สร้าง scene hashi-watashi เสร็จ: " + ScenePath +
+                "  | Arrows=เลื่อน Space=ดิ่งคีบ C=สลับกล้อง P=payout");
         }
 
         // ---------- Project settings ----------
@@ -86,10 +80,11 @@ namespace ClawMachine.EditorTools
 
         private static void ApplyPhysicsProjectSettings()
         {
-            // ชนแม่นยำ ขาไม่ทะลุของ (ดู PRD หัวข้อ 4)
-            Time.fixedDeltaTime = 0.01f;
-            Physics.defaultSolverIterations = 12;
-            Physics.defaultSolverVelocityIterations = 4;
+            // ชนแม่นยำ กล่องไม่ทะลุคานบางตอนขารัด (ดู PRD หัวข้อ 4)
+            // timestep ถี่ + solver iterations สูง = ดันกล่องกลับทันก่อนทะลุ
+            Time.fixedDeltaTime = 0.005f;          // 200Hz (จาก 100Hz)
+            Physics.defaultSolverIterations = 24;
+            Physics.defaultSolverVelocityIterations = 8;
         }
 
         private static PhysicsMaterial CreateLowFrictionMaterial()
@@ -119,23 +114,28 @@ namespace ClawMachine.EditorTools
             go.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
         }
 
+        // สนามเล่นสเกลจริง (manual: ตู้กว้าง 1683mm = 2 สถานี -> ต่อคน ~84cm, ลึก 875mm)
+        private const float FieldHalfX = 0.40f; // กว้าง 80cm
+        private const float FieldHalfZ = 0.30f; // ลึก 60cm
+        private const float GlassH = 0.85f;     // กระจกสูง 85cm — หุ้มหัว UFO ไว้ในตู้
+
         private static void BuildCabinet(PhysicsMaterial mat)
         {
             var root = new GameObject("Cabinet").transform;
 
-            // พื้นตู้ (ผิวบนที่ y=0)
+            // พื้นตู้ = ก้นหลุมรับของ (ผิวบนที่ y=0, สีเข้มให้รู้ว่าเป็นหลุม)
             MakeBox("Floor", new Vector3(0f, -0.025f, 0f),
-                new Vector3(0.6f, 0.05f, 0.6f), root, mat, new Color(0.2f, 0.2f, 0.22f));
+                new Vector3(FieldHalfX * 2f, 0.05f, FieldHalfZ * 2f), root, mat, new Color(0.06f, 0.06f, 0.08f));
 
             // ผนัง 4 ด้าน = กระจกใส (โปร่งแสง มองเห็นของข้างใน)
             var glass = CreateGlassMaterial();
-            const float h = 0.35f, t = 0.012f, half = 0.3f;
+            const float t = 0.012f;
             var walls = new[]
             {
-                MakeBox("Glass_Back", new Vector3(0f, h / 2f, half), new Vector3(0.6f, h, t), root, mat, Color.white),
-                MakeBox("Glass_Front", new Vector3(0f, h / 2f, -half), new Vector3(0.6f, h, t), root, mat, Color.white),
-                MakeBox("Glass_Left", new Vector3(-half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, Color.white),
-                MakeBox("Glass_Right", new Vector3(half, h / 2f, 0f), new Vector3(t, h, 0.6f), root, mat, Color.white),
+                MakeBox("Glass_Back", new Vector3(0f, GlassH / 2f, FieldHalfZ), new Vector3(FieldHalfX * 2f, GlassH, t), root, mat, Color.white),
+                MakeBox("Glass_Front", new Vector3(0f, GlassH / 2f, -FieldHalfZ), new Vector3(FieldHalfX * 2f, GlassH, t), root, mat, Color.white),
+                MakeBox("Glass_Left", new Vector3(-FieldHalfX, GlassH / 2f, 0f), new Vector3(t, GlassH, FieldHalfZ * 2f), root, mat, Color.white),
+                MakeBox("Glass_Right", new Vector3(FieldHalfX, GlassH / 2f, 0f), new Vector3(t, GlassH, FieldHalfZ * 2f), root, mat, Color.white),
             };
             foreach (var w in walls)
                 w.GetComponent<MeshRenderer>().sharedMaterial = glass;
@@ -175,53 +175,92 @@ namespace ClawMachine.EditorTools
         }
 
         // ===== Hashi-watashi (橋渡し) — สเกลจริงหน่วยเมตร =====
-        // คาน 2 อันวางขนานตามแกน X เว้นช่องตรงกลางตามแกน Z
-        // อ้างอิง: ช่องเล่นจริง ~50cm, คานเหล็กกลม ~2cm, กล่อง figure ~16cm
-        private const float BarZ = 0.06f;       // ตำแหน่ง z ของคานแต่ละอัน (±)
-        private const float BarThick = 0.02f;   // ความหนาคาน 2cm (จากเดิม 4cm)
-        private const float BarTopY = 0.16f;    // ผิวบนคาน
-        private const float GapHalfZ = BarZ - BarThick / 2f; // ขอบในคาน = ครึ่งช่อง (0.05 -> ช่อง 10cm)
+        // ตู้ figure จริงส่วนใหญ่ใช้ "คาน 4 อัน": กล่องพาดคู่กลาง (สวม pink tube หนึบ)
+        // หย่อนผ่านช่องกลาง = ได้รางวัล / คู่นอกเป็นราวเปล่า ลื่นกว่า
+        // ระยะกลาง->นอก (13.5cm) < กล่อง 20cm -> กล่องโดนดันจะค้างพาดกลาง-นอกได้
+        // (จังหวะ "เกือบได้" แบบตู้จริง) — ใต้คานทั้งหมดคือหลุม ร่วงตรงไหนก็ได้รางวัล
+        private const float BarZ = 0.075f;      // คู่กลาง: z กึ่งกลางคาน (±)
+        private const float OuterBarZ = 0.21f;  // คู่นอก: z กึ่งกลางคาน (±)
+        private const float BarDia = 0.025f;    // เส้นผ่านศูนย์กลางคาน 2.5cm
+        private const float BarTopY = 0.30f;    // ผิวบนคาน — ยกสูงให้เห็นกล่องร่วงเต็มตา
+        private const float GapHalfZ = BarZ - BarDia / 2f; // ขอบในคู่กลาง (ช่องใน 12cm)
 
-        private static void BuildBars(PhysicsMaterial mat)
+        private static BarSurface BuildBars(PhysicsMaterial mat)
         {
             var root = new GameObject("Bars").transform;
-            float cy = BarTopY - BarThick / 2f;
-            var barColor = new Color(0.85f, 0.2f, 0.2f); // คานสีแดงเด่น
-            MakeBar(root, "Bar_Front", new Vector3(0f, cy, -BarZ), mat, barColor);
-            MakeBar(root, "Bar_Back", new Vector3(0f, cy, BarZ), mat, barColor);
+            float cy = BarTopY - BarDia / 2f;
+
+            // ปลอกคานคู่กลาง (ค่าตามตัวเลือกใน MachineSettings: ไม่มี/ใส/pink tube)
+            // frictionCombine Maximum เพื่อชนะ Minimum ของกล่อง
+            // (กล่องลื่นบน shovel แต่หนึบบนคานตามปลอก) — BarSurface ปรับสดได้ตอน runtime
+            var settings = AssetDatabase.LoadAssetAtPath<MachineSettings>(SettingsPath);
+            var rubber = new PhysicsMaterial("BarRubber")
+            {
+                dynamicFriction = settings != null ? settings.BarDynamicFriction : 0.45f,
+                staticFriction = settings != null ? settings.BarStaticFriction : 0.55f,
+                bounciness = 0f,
+                // Average (ไม่ใช่ Maximum) — กล่องยังไถล/หมุนได้ตามจริง ไม่ถูกตรึงค้าง
+                frictionCombine = PhysicsMaterialCombine.Average,
+                bounceCombine = PhysicsMaterialCombine.Minimum
+            };
+            AssetDatabase.CreateAsset(rubber, "Assets/Physics/BarRubber.physicMaterial");
+
+            var pink = new Color(0.95f, 0.45f, 0.65f);   // pink tube
+            var chrome = new Color(0.75f, 0.75f, 0.78f); // ราวโลหะเปล่า
+
+            var midF = MakeBar(root, "Bar_Mid_Front", new Vector3(0f, cy, -BarZ), rubber, pink);
+            var midB = MakeBar(root, "Bar_Mid_Back", new Vector3(0f, cy, BarZ), rubber, pink);
+            MakeBar(root, "Bar_Outer_Front", new Vector3(0f, cy, -OuterBarZ), null, chrome);
+            MakeBar(root, "Bar_Outer_Back", new Vector3(0f, cy, OuterBarZ), null, chrome);
+
+            // ตัวจัดการปลอกคานคู่กลาง (ปรับ friction/สีสดจากแผง Tab)
+            var surface = root.gameObject.AddComponent<BarSurface>();
+            var bso = new SerializedObject(surface);
+            bso.FindProperty("settings").objectReferenceValue = settings;
+            var bars = bso.FindProperty("coveredBars");
+            bars.arraySize = 2;
+            bars.GetArrayElementAtIndex(0).objectReferenceValue = midF.GetComponent<Collider>();
+            bars.GetArrayElementAtIndex(1).objectReferenceValue = midB.GetComponent<Collider>();
+            var rends = bso.FindProperty("coveredRenderers");
+            rends.arraySize = 2;
+            rends.GetArrayElementAtIndex(0).objectReferenceValue = midF.GetComponent<Renderer>();
+            rends.GetArrayElementAtIndex(1).objectReferenceValue = midB.GetComponent<Renderer>();
+            bso.ApplyModifiedPropertiesWithoutUndo();
+
+            return surface;
         }
 
-        private static void MakeBar(Transform parent, string name, Vector3 pos, PhysicsMaterial mat, Color c)
+        // คานกลม: cylinder นอนตามแกน X ยาวชนผนังสองข้าง
+        private static GameObject MakeBar(Transform parent, string name, Vector3 pos,
+            PhysicsMaterial barMat, Color c)
         {
-            var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var bar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             bar.name = name;
             bar.transform.SetParent(parent, false);
             bar.transform.localPosition = pos;
-            bar.transform.localScale = new Vector3(0.5f, BarThick, BarThick);
+            bar.transform.localScale = new Vector3(BarDia, FieldHalfX, BarDia); // cylinder สูง 2 หน่วย -> ยาวชนผนัง
+            bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);  // นอนตามแกน X
             Paint(bar, c);
-            if (mat != null) bar.GetComponent<BoxCollider>().sharedMaterial = mat;
+            // Cylinder primitive ให้ MeshCollider (non-convex) มาซึ่งทนการชนแย่ + กล่องทะลุได้
+            // เปลี่ยนเป็น CapsuleCollider (convex) ทรงเดียวกับคานกลม -> ชนแม่น ไม่ทะลุ
+            Object.DestroyImmediate(bar.GetComponent<Collider>());
+            var cap = bar.AddComponent<CapsuleCollider>();
+            cap.direction = 1; // แกน Y (local) = แกนยาวคานหลังหมุน
+            cap.radius = 0.5f; cap.height = 2f; // หน่วย mesh-local (โดน scale เป็น 2.5cm dia)
+            if (barMat != null) cap.sharedMaterial = barMat;
+            return bar;
         }
 
-        // ช่องรับของ = โซนใต้คานตรงช่องว่าง (กล่องตกผ่านคานลงมาโดน = ได้รางวัล)
+        // จุดได้ของ = ใต้ตู้ทั้งหมด (คานเป็นสะพานข้ามหลุม — ร่วงตรงไหนก็ได้รางวัล)
         private static PrizeCatchZone BuildWinZone()
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = "WinZone";
             Object.DestroyImmediate(go.GetComponent<MeshRenderer>()); // trigger มองไม่เห็น
             go.transform.position = new Vector3(0f, 0.05f, 0f);
-            // คลุมเฉพาะใต้ช่องระหว่างคาน (z ±0.08) ไม่คลุมพื้นด้านนอก
-            go.transform.localScale = new Vector3(0.55f, 0.09f, 2f * GapHalfZ + 0.06f);
+            go.transform.localScale = new Vector3(
+                FieldHalfX * 2f - 0.02f, 0.09f, FieldHalfZ * 2f - 0.02f); // คลุมพื้นตู้ทั้งหมด
             go.GetComponent<BoxCollider>().isTrigger = true;
-
-            // marker พื้นสีเข้มใต้ช่อง ให้เห็นว่าเป็นช่องรับของ
-            var hole = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            hole.name = "HoleMarker";
-            hole.transform.SetParent(go.transform, false);
-            hole.transform.localScale = new Vector3(1f, 0.04f, 1f);
-            hole.transform.localPosition = new Vector3(0f, -0.45f, 0f);
-            Object.DestroyImmediate(hole.GetComponent<Collider>());
-            Paint(hole, new Color(0.04f, 0.04f, 0.05f));
-
             return go.AddComponent<PrizeCatchZone>();
         }
 
@@ -232,29 +271,63 @@ namespace ClawMachine.EditorTools
             var gantry = new GameObject("Gantry").transform;
             gantry.SetParent(machine, false);
             // เริ่มเหนือพื้นที่คาน (hashi-watashi คีบตรงไหนก็ปล่อยตรงนั้น)
-            gantry.localPosition = new Vector3(0f, 0.55f, -0.12f);
+            // ความสูงรางจริง: หัว UFO วิ่งใกล้เพดานกระจก
+            gantry.localPosition = new Vector3(0f, 0.72f, -0.12f);
             var claw = gantry.gameObject.AddComponent<ClawController>();
 
             var clawHead = new GameObject("ClawHead").transform;
             clawHead.SetParent(gantry, false);
             clawHead.localPosition = Vector3.zero;
 
-            // ลำตัวหัวคีบ = จานครอบ (saucer) แบบ UFO catcher
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            body.name = "HeadBody";
-            body.transform.SetParent(clawHead, false);
-            body.transform.localScale = new Vector3(0.09f, 0.025f, 0.09f); // แบนเป็นจาน
-            body.transform.localPosition = new Vector3(0f, 0.01f, 0f);
-            Paint(body, new Color(0.85f, 0.7f, 0.2f));
-            Object.DestroyImmediate(body.GetComponent<Collider>());
+            // โครงสร้างหัวจริง (อ้างรูปถ่ายตู้จริง FIG 3-1): จานแบนบางๆ มีแถบกลาง
+            // = "saucer" ไม่ใช่โดมทรงกลม — กลไกเล็กซ่อนใต้จาน ขายาวเป็นเพชรปิดใต้
+            // จานหลัก = แผ่นแบน (cylinder) Ø ~17cm หนา ~3.5cm
+            var saucer = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            saucer.name = "CrownCover";
+            saucer.transform.SetParent(clawHead, false);
+            saucer.transform.localScale = new Vector3(0.17f, 0.018f, 0.17f);
+            saucer.transform.localPosition = new Vector3(0f, 0.0f, 0f);
+            Paint(saucer, new Color(0.9f, 0.78f, 0.25f)); // เหลืองทอง
+            Object.DestroyImmediate(saucer.GetComponent<Collider>());
 
-            // แกนกลางเชื่อมขา
+            // โดมตื้นๆ บนจาน (ส่วนนูนเล็กน้อยด้านบน)
+            var dome = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            dome.name = "CrownDome";
+            dome.transform.SetParent(clawHead, false);
+            dome.transform.localScale = new Vector3(0.12f, 0.05f, 0.12f);
+            dome.transform.localPosition = new Vector3(0f, 0.018f, 0f);
+            Paint(dome, new Color(0.93f, 0.82f, 0.3f));
+            Object.DestroyImmediate(dome.GetComponent<Collider>());
+
+            // แถบกลาง (เส้นคาดรอบจาน เหมือนรอยต่อในรูปจริง) — วงแหวนบางสีเข้ม
+            var band = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            band.name = "CrownBand";
+            band.transform.SetParent(clawHead, false);
+            band.transform.localScale = new Vector3(0.175f, 0.006f, 0.175f);
+            band.transform.localPosition = new Vector3(0f, -0.002f, 0f);
+            Paint(band, new Color(0.55f, 0.45f, 0.15f));
+            Object.DestroyImmediate(band.GetComponent<Collider>());
+
+            // แผ่นใต้หัว (head underside) = ผิวที่ "โดนกล่อง" จริง — ถ้ากล่องสูง/อยู่กลาง
+            // หัวจะกดโดนแผ่นนี้แล้วหยุดดิ่ง (ตรงกับ research: หัวเครื่องโดนต้านแล้วหยุด)
+            var headPad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            headPad.name = "HeadContact";
+            headPad.transform.SetParent(clawHead, false);
+            headPad.transform.localScale = new Vector3(0.11f, 0.012f, 0.11f);
+            headPad.transform.localPosition = new Vector3(0f, -0.04f, 0f);
+            Paint(headPad, new Color(0.3f, 0.3f, 0.33f));
+            // trigger: ตรวจจับว่าหัวแตะกล่อง (หยุดดิ่ง) ได้ แต่ไม่ออกแรงดันกล่องทะลุคาน
+            // (pad แข็ง kinematic จะรัด/ดันกล่องลงทะลุคานบางก่อน solver ดันกลับทัน)
+            var headCol = headPad.GetComponent<Collider>();
+            headCol.isTrigger = true;
+
+            // กลไกจริง (กล่องเล็กใต้ครอบ ที่ขายึด) — เล็กกว่าฝาครอบมาก
             var hub = GameObject.CreatePrimitive(PrimitiveType.Cube);
             hub.name = "Hub";
             hub.transform.SetParent(clawHead, false);
-            hub.transform.localScale = new Vector3(0.03f, 0.04f, 0.03f);
-            hub.transform.localPosition = new Vector3(0f, -0.025f, 0f);
-            Paint(hub, new Color(0.3f, 0.3f, 0.33f));
+            hub.transform.localScale = new Vector3(0.05f, 0.03f, 0.035f);
+            hub.transform.localPosition = new Vector3(0f, -0.038f, 0f);
+            Paint(hub, new Color(0.28f, 0.28f, 0.3f));
             Object.DestroyImmediate(hub.GetComponent<Collider>());
 
             var grip = clawHead.gameObject.AddComponent<ClawGripSystem>();
@@ -270,16 +343,17 @@ namespace ClawMachine.EditorTools
             var leftArm = BuildArm("LeftArm", clawHead, mat, -1f, headRb, settings);
             var rightArm = BuildArm("RightArm", clawHead, mat, 1f, headRb, settings);
 
-            // GrabPoint กึ่งกลางปลายขา
+            // GrabPoint กึ่งกลางปลายขา (ขา L ปลายอยู่ลึก ~0.20 ใต้หัว)
             var grabPoint = new GameObject("GrabPoint").transform;
             grabPoint.SetParent(clawHead, false);
-            grabPoint.localPosition = new Vector3(0f, -0.16f, 0f);
+            grabPoint.localPosition = new Vector3(0f, -0.19f, 0f);
 
             // จุดวัด "ของอยู่ใต้หัว" = ก้น hub (ไม่ใช่ปลายขา!) — ขาจะดิ่งลึกจน shovel
             // อยู่ใต้ก้นกล่องก่อนหัวจะแตะของแล้วค่อยหุบ (ช้อนได้จริง)
+            // จุดเซนเซอร์อยู่ที่ผิวใต้หัว (head underside) — หัวเครื่องโดนของแล้วหยุด
             var dropProbe = new GameObject("DropProbe").transform;
             dropProbe.SetParent(clawHead, false);
-            dropProbe.localPosition = new Vector3(0f, -0.05f, 0f);
+            dropProbe.localPosition = new Vector3(0f, -0.048f, 0f);
 
             var cso = new SerializedObject(claw);
             cso.FindProperty("dropProbe").objectReferenceValue = dropProbe;
@@ -294,8 +368,9 @@ namespace ClawMachine.EditorTools
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
             so.FindProperty("holdCheckRadius").floatValue = 0.05f;   // ตรวจว่ามีของในง่าม (HUD)
-            so.FindProperty("resistanceAngle").floatValue = 18f;     // เผื่อขาเฉียด/ครูดตอนคร่อมกล่อง
+            so.FindProperty("resistanceAngle").floatValue = 14f;     // เริ่มต้น (ถูก override จาก pushForceKnob)
             so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
+            so.FindProperty("headCollider").objectReferenceValue = headCol;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             return (claw, grip);
@@ -306,34 +381,41 @@ namespace ClawMachine.EditorTools
         private static MachineSettings CreateMachineSettings()
         {
             var s = ScriptableObject.CreateInstance<MachineSettings>();
-            s.power = 55;
+            // ตู้ pink tube จริงตั้ง POWER สูงเกือบ MAX ชดเชยความหนึบของยางคาน
+            s.power = 75;
             s.springStage = MachineSettings.SpringStage.Middle;
-            s.armSize = MachineSettings.ArmSize.M;
+            s.armSize = MachineSettings.ArmSize.L; // กล่อง figure 20cm ร้านจริงใช้ขา L
             s.shovel = MachineSettings.ShovelType.W40;
-            s.openArmAngle = 50f; // spec จริง: กาง ~45-50° ช่องเปิดพอคร่อมกล่อง figure
-            s.shovelGapCm = 0.5f; // 13-4: ปลายเกือบแตะ ไม่ overlap
-            s.clawYaw = 45f;      // ตู้จริงส่วนใหญ่ขากางทแยง 45° กับคาน
+            s.openArmAngle = 80f; // กางเต็มมาตรฐาน: ปลายเล็บถึงระดับข้อศอก (ง่ามกว้าง ~20cm)
+            s.shovelGapCm = 1.5f; // ตั้งให้ปลายขาเหลือช่องเห็นชัด (ปรับ 0-3cm ในแผง 13-4)
+            s.clawYaw = 0f;       // กางขนานคาน (ปรับทแยงได้ในแผง Tab)
+            s.armOffsetCm = 1.6f; // ขาขนานแต่เยื้องกัน — shovel สวนผ่านกันได้ตอนหุบ
             s.segaMode = true; // SEGA แท้: แรงคงที่ สู้ด้วยการจัดวาง (hashi-watashi)
             Directory.CreateDirectory("Assets/Physics");
             AssetDatabase.CreateAsset(s, SettingsPath);
             return s;
         }
 
-        // ง่ามคีบ = นิ้วโค้ง 2 ท่อน (capsule) + ปลายแหลมงอเข้า แบบ UFO catcher จริง
+        // ขาตัว L ตาม manual จริง (ARM S/M/L): ท่อนดิ่งจาก pivot + หักศอกเป็นท่อนนอนยื่นเข้าใน
+        // + shovel แผ่นพับยึดปลายท่อนนอน — ขนาด/ระยะทั้งหมดมาจาก ArmGeometry (ชุดเดียวกับ grip)
+        // ขาสองข้างขนานกันแต่ "เยื้องกัน" ตามแกน Z เหมือนเครื่องจริง (shovel สวนผ่านกันได้)
         // ขาเป็น Rigidbody ห้อยจากหัวด้วย HingeJoint -> เบนหลบของได้ (สมจริงตาม manual: ขาสปริง)
         private static Transform BuildArm(string name, Transform parent, PhysicsMaterial mat,
             float inwardSign, Rigidbody headAnchor, MachineSettings settings)
         {
             var metal = new Color(0.82f, 0.82f, 0.87f);
 
-            // pivot ที่แกนกลางหัวคีบ — หมุนรอบ Z เพื่อหุบ/กาง
+            // pivot แยกออกจากแกนกลางเล็กน้อย + เยื้องข้างตามแกน Z (ซ้าย +z / ขวา -z)
             var pivot = new GameObject(name).transform;
             pivot.SetParent(parent, false);
-            pivot.localPosition = new Vector3(0f, -0.03f, 0f);
+            pivot.localPosition = new Vector3(
+                -inwardSign * ArmGeometry.PivotOut,
+                -0.03f,
+                -inwardSign * settings.armOffsetCm * 0.005f);
 
             // physics: ขาห้อยจากหัวคีบ แกว่ง/เบนได้รอบแกน Z
             var rb = pivot.gameObject.AddComponent<Rigidbody>();
-            rb.mass = 0.05f;
+            rb.mass = 0.07f; // แถบสแตนเลสพับ ~18x2mm ยาว ~25cm + shovel (ประเมินจาก exploded view)
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
@@ -341,6 +423,8 @@ namespace ClawMachine.EditorTools
             hinge.connectedBody = headAnchor;
             hinge.anchor = Vector3.zero;            // หมุนรอบจุดบนสุดของขา
             hinge.axis = Vector3.forward;           // แกน Z
+            hinge.autoConfigureConnectedAnchor = false;
+            hinge.connectedAnchor = pivot.localPosition; // local ของ clawHead (= connected body)
             hinge.useSpring = true;
             var spring = hinge.spring;
             spring.targetPosition = -inwardSign * settings.openArmAngle; // ซ้าย=+ / ขวา=- (มิเรอร์)
@@ -348,33 +432,46 @@ namespace ClawMachine.EditorTools
             spring.damper = 0.05f;
             hinge.spring = spring;
             var limits = hinge.limits;
-            limits.min = -85f;
-            limits.max = 85f;
+            limits.min = -100f;
+            limits.max = 100f;
             hinge.limits = limits;
             hinge.useLimits = true;
 
-            // ท่อนบน (shoulder): ยื่นลงบานออกเล็กน้อย
+            // ท่อนดิ่ง (shoulder): จาก pivot ตรงลงข้อศอก — แถบสแตนเลสบาง (ไม่ใช่ท่อหนา)
             var shoulder = MakeCapsule(name + "_Shoulder", pivot, mat, metal);
-            shoulder.localScale = new Vector3(0.02f, 0.04f, 0.02f);
-            shoulder.localPosition = new Vector3(-inwardSign * 0.012f, -0.05f, 0f);
-            shoulder.localRotation = Quaternion.Euler(0f, 0f, -inwardSign * 14f);
+            shoulder.localScale = new Vector3(0.009f, ArmGeometry.ShoulderLen / 2f, 0.018f);
+            shoulder.localPosition = new Vector3(0f, -ArmGeometry.ShoulderLen / 2f, 0f);
 
-            // ท่อนล่าง (finger): โค้งเข้าหากึ่งกลางเป็นตะขอ
-            var finger = MakeCapsule(name + "_Finger", pivot, mat, metal);
-            finger.localScale = new Vector3(0.017f, 0.045f, 0.017f);
-            finger.localPosition = new Vector3(-inwardSign * 0.004f, -0.12f, 0f);
-            finger.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 26f);
+            // ท่อนนอน (foot): หักศอก ~90° ยื่นเข้าหากึ่งกลาง
+            var foot = MakeCapsule(name + "_Foot", pivot, mat, metal);
+            foot.localScale = new Vector3(0.008f, ArmGeometry.FootLen / 2f, 0.018f);
+            foot.localPosition = new Vector3(
+                inwardSign * ArmGeometry.FootLen / 2f, -ArmGeometry.ShoulderLen, 0f);
+            foot.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 90f);
 
-            // shovel = แผ่นแบนช้อนใต้ของ (13-4: W30/W40/W60 ตามชนิดของรางวัล)
-            // เอียงมากจนเกือบนอนตอนหุบ — หนีบไม่ได้ ได้แต่รอง/ตักตามฟิสิกส์จริง
+            // หน้าแปลนปลายขา: หักลง ~15° จากแนวท่อนนอน (วัดจากรูป ARM S) — จุดยึด shovel
+            var flange = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            flange.name = name + "_Flange";
+            flange.transform.SetParent(pivot, false);
+            flange.transform.localScale = new Vector3(0.016f, 0.002f, 0.018f);
+            flange.transform.localPosition = new Vector3(
+                inwardSign * (ArmGeometry.FootLen + 0.006f),
+                -(ArmGeometry.ShoulderLen + 0.003f), 0f);
+            flange.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * -15f);
+            Paint(flange, metal);
+            Object.DestroyImmediate(flange.GetComponent<Collider>()); // ชิ้นรูปทรง — ใช้ collider แผ่นหลัก
+
+            // shovel = แผ่นพับยึดปลายท่อนนอน (13-4: W30/W40/W60 ตามชนิดของรางวัล)
+            // แผ่นแบนช้อนใต้ของ — หนีบไม่ได้ ได้แต่รอง/ตักตามฟิสิกส์จริง
+            // มุมหน้าช้อน: ClawGripSystem.ApplyShovel ตั้งให้ V ตื้น ~6° ตอนหุบ (วัดจากรูปจริง)
             var tip = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tip.name = name + "_Shovel_" + settings.shovel;
             tip.transform.SetParent(pivot, false);
-            // เรขาคณิต spec จริง: กาง 50° ช่องเปิด ~17cm / หุบ 15° ปลายเกือบแตะ (ไม่ทับกัน)
-            // มุมปลาย = closedAngle+scoop เพื่อให้แผ่นราบพอดีตอนหุบ (grip จะอัปเดตสดอีกที)
-            tip.transform.localScale = new Vector3(0.04f, 0.006f, settings.ShovelWidthMeters);
-            tip.transform.localPosition = new Vector3(inwardSign * 0.02f, -0.165f, 0f);
-            tip.transform.localRotation = Quaternion.Euler(0f, 0f, inwardSign * 20f);
+            tip.transform.localScale = new Vector3(
+                ArmGeometry.PlateLen, 0.004f, settings.ShovelWidthMeters);
+            tip.transform.localPosition = new Vector3(
+                inwardSign * (ArmGeometry.FootLen + ArmGeometry.PlateCenterBeyondFoot),
+                -ArmGeometry.TipDown, 0f);
             Paint(tip, metal);
             var tcol = tip.GetComponent<BoxCollider>();
             if (mat != null) tcol.sharedMaterial = mat;
@@ -382,14 +479,18 @@ namespace ClawMachine.EditorTools
             return pivot;
         }
 
+        // ขา = แถบแบน: ใช้ capsule เป็น "ภาพ" แต่ collider เป็น BoxCollider พอดีแถบ
+        // (CapsuleCollider เอารัศมี = max(scale x,z) -> บวมด้านบางจนชนทั้งที่ยังไม่แตะ)
         private static Transform MakeCapsule(string name, Transform parent, PhysicsMaterial mat, Color c)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             go.name = name;
             go.transform.SetParent(parent, false);
             Paint(go, c);
-            var col = go.GetComponent<CapsuleCollider>();
-            if (mat != null && col != null) col.sharedMaterial = mat;
+            Object.DestroyImmediate(go.GetComponent<CapsuleCollider>());
+            var box = go.AddComponent<BoxCollider>();
+            box.size = new Vector3(1f, 2f, 1f); // capsule mesh สูง 2 หน่วย -> ครอบพอดีแถบ
+            if (mat != null) box.sharedMaterial = mat;
             return go.transform;
         }
 
@@ -401,10 +502,10 @@ namespace ClawMachine.EditorTools
 
         private static (Camera front, Camera side) BuildCameras()
         {
-            var front = MakeCamera("FrontCamera", new Vector3(0f, 0.55f, -0.95f), true);
+            var front = MakeCamera("FrontCamera", new Vector3(0f, 0.62f, -1.55f), true);
             front.gameObject.AddComponent<AudioListener>();
 
-            var side = MakeCamera("SideCamera", new Vector3(0.95f, 0.55f, 0f), false);
+            var side = MakeCamera("SideCamera", new Vector3(1.55f, 0.62f, 0f), false);
             return (front, side);
         }
 
@@ -412,7 +513,7 @@ namespace ClawMachine.EditorTools
         {
             var go = new GameObject(name);
             go.transform.position = pos;
-            go.transform.LookAt(new Vector3(0f, 0.1f, 0f));
+            go.transform.LookAt(new Vector3(0f, 0.42f, 0f)); // เล็งกลางตู้ เห็นหัวถึงคาน
             var cam = go.AddComponent<Camera>();
             cam.enabled = enabled;
             cam.backgroundColor = new Color(0.05f, 0.05f, 0.08f);
@@ -421,13 +522,13 @@ namespace ClawMachine.EditorTools
             return cam;
         }
 
-        // กล่อง figure วางพาดขวางคาน 2 อัน (ปลายเกยคาน กลางลอยเหนือช่อง)
-        // ด้านยาว Z = 0.14 (พาดคาน) / ด้านแคบ X = 0.07 < ช่อง 0.10 → พอหมุนขนานคานก็ร่วง (tatehame)
+        // กล่อง figure วางพาดขวางคาน 2 อัน (ปลายเกยคานข้างละ ~1cm กลางลอยเหนือช่อง)
+        // หมุนขนานคานเมื่อไหร่ (กว้าง 10 < ช่องใน 12) ก็ร่วง = tatehame
         private static void SpawnBoxesOnBars(PhysicsMaterial mat, int layer)
         {
             var root = new GameObject("Figures").transform;
-            // กล่อง figure จริง ~16cm: ยาว Z=16cm (พาดคาน) / แคบ X=8cm < ช่อง 10cm / สูง 7cm
-            var boxSize = new Vector3(0.08f, 0.07f, 0.16f);
+            // กล่อง figure สเกลจริง (Banpresto ฯลฯ ~20cm): ยาว Z=20 (พาดคาน) / กว้าง X=10 / สูง 9
+            var boxSize = new Vector3(0.10f, 0.09f, 0.20f);
             float restY = BarTopY + boxSize.y / 2f + 0.001f;
 
             // โหมดทดลอง: กล่องเดียว วางท่ามาตรฐานร้านจริง — พาดขวางคานตรงๆ กลางตู้
@@ -452,8 +553,13 @@ namespace ClawMachine.EditorTools
                 if (mat != null) col.sharedMaterial = mat;
 
                 var rb = go.AddComponent<Rigidbody>();
-                rb.mass = 0.3f;
-                rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                rb.mass = 0.3f; // วัดจริง: กล่อง figure รวมกล่อง ~265-500g ส่วนใหญ่ ~300g
+                // จุดศูนย์ถ่วงจริงเกือบกึ่งกลาง ต่ำกว่านิดเดียว (รีวิวผู้เล่น: "ก้นหนักกว่า
+                // เล็กน้อย ไม่ถึงระดับมีผลกับ hashiwatashi") — local ของ unit cube
+                rb.centerOfMass = new Vector3(0f, -0.05f, 0f);
+                // Speculative = สร้าง contact ก่อนทะลุ กันกล่องโดนขารัดทะลุคานบาง
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                rb.maxDepenetrationVelocity = 3f; // ดันออกนุ่มๆ ไม่ดีดกระเด็น
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
 
                 var prize = go.AddComponent<Prize>();
@@ -475,14 +581,15 @@ namespace ClawMachine.EditorTools
                 AssetDatabase.LoadAssetAtPath<MachineSettings>(SettingsPath); // 13-2 sensor bracket
             so.FindProperty("returnToChute").boolValue = false; // hashi-watashi: ปล่อยตรงจุดที่คีบ
             so.FindProperty("yTop").floatValue = 0f;
-            so.FindProperty("yBottom").floatValue = -0.40f;
-            so.FindProperty("xLimits").vector2Value = new Vector2(-0.22f, 0.22f);
-            so.FindProperty("zLimits").vector2Value = new Vector2(-0.22f, 0.22f);
+            so.FindProperty("yBottom").floatValue = -0.58f; // gantry 0.72 - ปลายขา ~0.18 -> เกือบถึงพื้น
+            // ค่าตั้งต้นเท่านั้น — ApplyFromSettings จะคำนวณจริงจาก 13-2 ตอน Start
+            so.FindProperty("xLimits").vector2Value = new Vector2(-0.30f, 0.30f);
+            so.FindProperty("zLimits").vector2Value = new Vector2(-0.19f, 0.19f);
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void WireSystems(ClawController claw, ClawGripSystem grip, PayoutManager payout,
-            PrizeCatchZone chute, Camera front, Camera side)
+            PrizeCatchZone chute, Camera front, Camera side, BarSurface barSurface)
         {
             var systems = payout.gameObject;
 
@@ -512,6 +619,7 @@ namespace ClawMachine.EditorTools
             pso.FindProperty("grip").objectReferenceValue = grip;
             pso.FindProperty("claw").objectReferenceValue = claw;
             pso.FindProperty("payout").objectReferenceValue = payout;
+            pso.FindProperty("barSurface").objectReferenceValue = barSurface;
             pso.ApplyModifiedPropertiesWithoutUndo();
         }
 

@@ -35,13 +35,14 @@ namespace ClawMachine
         [Header("13-2 Sensor bracket (จำกัดพื้นที่เลื่อนตามขนาดขา)")]
         [Tooltip("ถ้า assign settings ขอบเขตจะคำนวณจากความยาวขา+มุมกาง (ขา L = พื้นที่แคบลง)")]
         [SerializeField] private MachineSettings machineSettings;
-        [Tooltip("ครึ่งความกว้างพื้นที่เล่นในตู้ (ถึงผนังกระจก)")]
-        [SerializeField] private float cabinetHalfExtent = 0.30f;
+        [Tooltip("ครึ่งความกว้างพื้นที่เล่นในตู้ถึงผนังกระจก (x=กว้าง, y=ลึก z)")]
+        [SerializeField] private Vector2 cabinetHalfExtent = new Vector2(0.40f, 0.30f);
         [Tooltip("ระยะกันปลายขาเฉี่ยวกระจก")]
         [SerializeField] private float wallClearance = 0.01f;
 
         /// <summary>ขอบเขตเลื่อนปัจจุบัน (สำหรับแสดงบนแผงปรับ)</summary>
         public float CurrentTravelLimit => xLimits.y;
+        public float CurrentTravelLimitZ => zLimits.y;
 
         /// <summary>
         /// 13-2: คำนวณขอบเขตเลื่อนใหม่จากขนาดขา — ปลายขาตอนกางต้องไม่ถึงกระจก
@@ -50,12 +51,13 @@ namespace ClawMachine
         public void ApplyFromSettings()
         {
             if (machineSettings == null) return;
-            // รัศมีปลายขาตอนกาง = sin(มุมกาง) × ความยาวขา (ขา M = 0.165m)
-            float tipReach = Mathf.Sin(machineSettings.openArmAngle * Mathf.Deg2Rad)
-                             * 0.165f * machineSettings.ArmSizeScale;
-            float limit = Mathf.Max(0.05f, cabinetHalfExtent - tipReach - wallClearance);
-            xLimits = new Vector2(-limit, limit);
-            zLimits = new Vector2(-limit, limit);
+            // รัศมีปลายขาตอนกาง — คิดจากเรขาคณิตขาตัว L จริง (ท่อนดิ่ง+ท่อนนอน+shovel)
+            float tipReach = ArmGeometry.OpenTipReach(
+                machineSettings.openArmAngle, machineSettings.ArmSizeScale);
+            float xLim = Mathf.Max(0.05f, cabinetHalfExtent.x - tipReach - wallClearance);
+            float zLim = Mathf.Max(0.05f, cabinetHalfExtent.y - tipReach - wallClearance);
+            xLimits = new Vector2(-xLim, xLim);
+            zLimits = new Vector2(-zLim, zLim);
         }
 
         [Header("ตำแหน่งแกน Y (local ของ clawHead)")]
@@ -77,8 +79,10 @@ namespace ClawMachine
         [Header("จังหวะเวลา")]
         [Tooltip("C2: ค้างแรงหุบก่อนยก (วินาที)")]
         [SerializeField] private float holdDuration = 1.2f;
-        [Tooltip("หน่วงก่อนกางขาปล่อยของที่ท่อ")]
-        [SerializeField] private float releaseDelay = 0.4f;
+        [Tooltip("เวลากางขาหลังกดปุ่ม ก่อนเริ่มดิ่ง (เครื่องจริงขาหุบพัก กางก่อนลง)")]
+        [SerializeField] private float armOpenDelay = 0.7f;
+        [Tooltip("เวลากางขาค้างตอนปล่อยของ ก่อนกลับไปหุบพัก")]
+        [SerializeField] private float releaseDelay = 0.8f;
 
         [Header("Input")]
         [SerializeField] private KeyCode dropKey = KeyCode.Space;
@@ -133,7 +137,7 @@ namespace ClawMachine
         private void EnterAiming()
         {
             State = ClawState.Aiming;
-            gripSystem.OpenArms();
+            gripSystem.RestArms(); // เครื่องจริง: ขาหุบพักตอนเล็ง
         }
 
         private void TickAiming()
@@ -149,6 +153,8 @@ namespace ClawMachine
             if (Input.GetKeyDown(dropKey))
             {
                 State = ClawState.Dropping;
+                stateTimer = 0f;
+                gripSystem.OpenArms(); // กางขาก่อน แล้วค่อยเริ่มดิ่ง
             }
         }
 
@@ -156,6 +162,10 @@ namespace ClawMachine
 
         private void TickDropping()
         {
+            // ช่วงแรก: รอขากางออกให้สุดก่อน (ยังไม่ขยับลง)
+            stateTimer += Time.deltaTime;
+            if (stateTimer < armOpenDelay) return;
+
             // ดิ่งต่อจนกว่ามี "แรงต้านจริง": ขาโดนของดันจนเบี่ยงเกิน threshold
             // (เฉียดขอบ = ขาแกว่งนิดเดียวแล้วลื่นผ่าน — ดิ่งต่อ)
             if (gripSystem.ArmsResisted())
@@ -241,6 +251,7 @@ namespace ClawMachine
         {
             State = ClawState.Releasing;
             stateTimer = 0f;
+            gripSystem.OpenArms(); // ปล่อยของทันที แล้วค้างกางไว้ครู่หนึ่ง
         }
 
         // ---------- C4: Returning ----------
@@ -264,6 +275,7 @@ namespace ClawMachine
             {
                 State = ClawState.Releasing;
                 stateTimer = 0f;
+                gripSystem.OpenArms(); // ปล่อยของลงท่อ
             }
         }
 
@@ -274,8 +286,7 @@ namespace ClawMachine
             stateTimer += Time.deltaTime;
             if (stateTimer >= releaseDelay)
             {
-                gripSystem.OpenArms(); // ปล่อยของลงท่อ
-                EnterAiming();         // พร้อมเล่นรอบใหม่
+                EnterAiming(); // กลับไปหุบพัก พร้อมเล่นรอบใหม่
             }
         }
 

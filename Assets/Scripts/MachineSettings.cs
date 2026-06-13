@@ -37,16 +37,47 @@ namespace ClawMachine
         public ShovelType shovel = ShovelType.W40;
 
         // ===== 13-4: สกรูปรับระยะห่าง shovel ตอนหุบ (overlap adjustment screw) =====
-        [Header("ระยะห่างปลาย shovel ตอนหุบ (cm) — manual: ต้องไม่ overlap")]
-        [Range(0f, 3f)] public float shovelGapCm = 0.5f;
+        // สเปคจริงจาก exploded view (26): ระยะปลายตอนหุบ = 1±1 mm (เกือบแตะ ห้ามทับ)
+        [Header("ระยะห่างปลาย shovel ตอนหุบ (cm) — สเปคโรงงาน 0.1")]
+        [Range(0f, 3f)] public float shovelGapCm = 0.1f;
+
+        // ===== สกรูเงินปรับแรงดันลง (UFO9 push-force knob) =====
+        // research: หมุนเข้า=เซนเซอร์ไว ดันเบา หยุดเร็ว / หมุนออก=ทื่อ ดันแรงกว่าก่อนหยุด
+        // ในซิม = องศาที่ขาต้องเบี่ยง (โดนของดัน) ก่อนนับว่า "ต้าน" แล้วหยุดดิ่ง
+        [Header("สกรูเงินปรับแรงดันลง (UFO9) — องศาเบี่ยงก่อนหยุด")]
+        [Range(4f, 40f)] public float pushForceKnob = 14f;
 
         // ===== 13-5: มุมกางขา (เลื่อน sensor bracket ด้าน A = กว้าง / B = แคบ) =====
+        // กางเต็มมาตรฐานเครื่องจริง: "ปลายเล็บกางถึงตำแหน่งข้อศอกตอนหุบ"
+        // (cranegame-kotsu.com) = ~80° จากแนวดิ่งในเรขาคณิตขานี้ / ตู้บางตู้ตั้งแคบกว่า
         [Header("มุมกางขา (องศา)")]
-        [Range(20f, 60f)] public float openArmAngle = 50f;
+        [Range(40f, 88f)] public float openArmAngle = 80f;
 
         // ===== ทิศการกางขาเทียบคาน (ไม่มีใน manual — กำหนดโดยการติดตั้ง/รุ่นเครื่อง) =====
-        [Header("ทิศการกางขา (หมุนรอบแกนตั้ง) — ตู้จริงส่วนใหญ่ทแยง ~45° กับคาน")]
-        [Range(0f, 90f)] public float clawYaw = 45f;
+        [Header("ทิศการกางขา (หมุนรอบแกนตั้ง) — 0 = กางขนานคาน")]
+        [Range(0f, 90f)] public float clawYaw = 0f;
+
+        // ===== ระยะเยื้องขา (ดีไซน์ hub จริง: ขาขนานกันแต่ไม่ตรงกัน) =====
+        // manual 13-4 ให้เช็คว่า shovel ไม่ overlap ตอนหุบ = ขาถูกออกแบบให้สวนผ่านกันได้
+        // ค่าลบ = สลับฝั่งการเยื้อง (ซ้าย-ขวากลับกัน)
+        [Header("ระยะเยื้องขาซ้าย-ขวา (cm) — ขาขนานกันแต่เยื้องกันเหมือนเครื่องจริง")]
+        [Range(-4f, 4f)] public float armOffsetCm = 1.6f;
+
+        // ===== ปลอกคานคู่กลาง (การจัดตู้ hashi-watashi) =====
+        // research (grabbit/90N): ไม่มีปลอก = ลื่นสุด (ง่าย) / ปลอกใส = ลื่นกว่า /
+        // pink tube = หนึบสุด (ร้านชดเชยด้วย POWER เกือบ MAX)
+        public enum BarCover { Bare, ClearTube, PinkTube }
+        [Header("ปลอกคานคู่กลาง")]
+        public BarCover barCover = BarCover.PinkTube;
+
+        /// <summary>แรงเสียดทานสถิตของผิวคานตามปลอก (กระดาษกล่องบนยาง ~0.5)</summary>
+        public float BarStaticFriction =>
+            barCover == BarCover.Bare ? 0.18f :
+            barCover == BarCover.ClearTube ? 0.32f : 0.48f;
+
+        public float BarDynamicFriction =>
+            barCover == BarCover.Bare ? 0.12f :
+            barCover == BarCover.ClearTube ? 0.24f : 0.38f;
 
         // ===== โหมดจ่ายรางวัล =====
         [Header("โหมดจ่ายรางวัล")]
@@ -57,10 +88,13 @@ namespace ClawMachine
         [Tooltip("เฉพาะ kakuritsu: สัดส่วนแรงรอบปกติเทียบแรงเต็ม")]
         [Range(0.05f, 1f)] public float normalGripRatio = 0.15f;
 
-        // ===== ขอบเขตแรง (จูนระดับโปรเจกต์ ไม่ใช่ระดับตู้) =====
-        [Header("ขอบเขตแรง (newtons) — แปลงจาก POWER")]
-        public float minGripForce = 1f;
-        public float maxGripForce = 60f;
+        // ===== ขอบเขตแรงกดปลายขา (N ต่อขา 1 ข้าง) =====
+        // ที่มา (คำนวณจากขอบเขตจริง ไม่ใช่ค่าวัดตรง):
+        // - แรงเต็มต้องถือของ ~1kg ในราง V ~42° ได้: 9.8N×tan42° ≈ 8.8N รวม → max 12N/ขา
+        // - แรงอ่อนสุดต้องถือกล่อง figure 300g ไม่ได้ (ต้องการ ~1.3N/ขา) → min 0.3N
+        [Header("ขอบเขตแรงกดปลายขา (N/ขา) — แปลงจาก POWER 00-99")]
+        public float minGripForce = 0.3f;
+        public float maxGripForce = 12f;
 
         // ---------- ค่าคำนวณ ----------
 
