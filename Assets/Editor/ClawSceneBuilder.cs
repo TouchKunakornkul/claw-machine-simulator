@@ -80,10 +80,11 @@ namespace ClawMachine.EditorTools
 
         private static void ApplyPhysicsProjectSettings()
         {
-            // ชนแม่นยำ ขาไม่ทะลุของ (ดู PRD หัวข้อ 4)
-            Time.fixedDeltaTime = 0.01f;
-            Physics.defaultSolverIterations = 12;
-            Physics.defaultSolverVelocityIterations = 4;
+            // ชนแม่นยำ กล่องไม่ทะลุคานบางตอนขารัด (ดู PRD หัวข้อ 4)
+            // timestep ถี่ + solver iterations สูง = ดันกล่องกลับทันก่อนทะลุ
+            Time.fixedDeltaTime = 0.005f;          // 200Hz (จาก 100Hz)
+            Physics.defaultSolverIterations = 24;
+            Physics.defaultSolverVelocityIterations = 8;
         }
 
         private static PhysicsMaterial CreateLowFrictionMaterial()
@@ -315,8 +316,10 @@ namespace ClawMachine.EditorTools
             headPad.transform.localScale = new Vector3(0.11f, 0.012f, 0.11f);
             headPad.transform.localPosition = new Vector3(0f, -0.04f, 0f);
             Paint(headPad, new Color(0.3f, 0.3f, 0.33f));
+            // trigger: ตรวจจับว่าหัวแตะกล่อง (หยุดดิ่ง) ได้ แต่ไม่ออกแรงดันกล่องทะลุคาน
+            // (pad แข็ง kinematic จะรัด/ดันกล่องลงทะลุคานบางก่อน solver ดันกลับทัน)
             var headCol = headPad.GetComponent<Collider>();
-            if (mat != null) headCol.sharedMaterial = mat;
+            headCol.isTrigger = true;
 
             // กลไกจริง (กล่องเล็กใต้ครอบ ที่ขายึด) — เล็กกว่าฝาครอบมาก
             var hub = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -554,7 +557,9 @@ namespace ClawMachine.EditorTools
                 // จุดศูนย์ถ่วงจริงเกือบกึ่งกลาง ต่ำกว่านิดเดียว (รีวิวผู้เล่น: "ก้นหนักกว่า
                 // เล็กน้อย ไม่ถึงระดับมีผลกับ hashiwatashi") — local ของ unit cube
                 rb.centerOfMass = new Vector3(0f, -0.05f, 0f);
-                rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                // Speculative = สร้าง contact ก่อนทะลุ กันกล่องโดนขารัดทะลุคานบาง
+                rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                rb.maxDepenetrationVelocity = 3f; // ดันออกนุ่มๆ ไม่ดีดกระเด็น
                 rb.interpolation = RigidbodyInterpolation.Interpolate;
 
                 var prize = go.AddComponent<Prize>();
