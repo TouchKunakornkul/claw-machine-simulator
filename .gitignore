@@ -43,3 +43,7 @@ Thumbs.db
 # Crashlytics / Unity diagnostics
 crashlytics-build.properties
 sysinfo.txt
+
+# MCP screenshots (local only)
+Assets/Screenshots/
+Assets/Screenshots.meta
