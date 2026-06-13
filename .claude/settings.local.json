@@ -6,7 +6,8 @@
       "WebFetch(domain:www.gamesasylum.com)",
       "WebSearch",
       "mcp__unity-mcp__Unity_ManageEditor",
-      "mcp__unity-mcp__Unity_GetConsoleLogs"
+      "mcp__unity-mcp__Unity_GetConsoleLogs",
+      "WebFetch(domain:grabbit.co.jp)"
     ]
   }
 }

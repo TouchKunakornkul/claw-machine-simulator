@@ -114,6 +114,8 @@ namespace ClawMachine
         [SerializeField] private float resistanceAngle = 10f;
         [SerializeField] private Transform grabPoint;
         [SerializeField] private LayerMask prizeLayer = ~0;
+        [Tooltip("collider ใต้หัว (HeadContact) — กันชนกับขาตัวเอง แต่ยังโดนกล่องได้")]
+        [SerializeField] private Collider headCollider;
 
         public GripPhase Phase { get; private set; } = GripPhase.RestClosed;
         /// <summary>มีของอยู่ระหว่างง่ามไหม (ตรวจทาง physics ไม่มีการยึด)</summary>
@@ -145,6 +147,17 @@ namespace ClawMachine
                 foreach (var lc in leftArm.GetComponentsInChildren<Collider>())
                     foreach (var rc in rightArm.GetComponentsInChildren<Collider>())
                         Physics.IgnoreCollision(lc, rc, true);
+            }
+
+            // กันแผ่นใต้หัวชนขาตัวเอง (แต่ยังโดนกล่องได้ = หัวเครื่องโดนต้าน)
+            if (headCollider != null)
+            {
+                if (leftArm != null)
+                    foreach (var c in leftArm.GetComponentsInChildren<Collider>())
+                        Physics.IgnoreCollision(headCollider, c, true);
+                if (rightArm != null)
+                    foreach (var c in rightArm.GetComponentsInChildren<Collider>())
+                        Physics.IgnoreCollision(headCollider, c, true);
             }
 
             ReapplyPhase();              // เริ่มแบบเครื่องจริง: ขาหุบพัก
@@ -210,6 +223,9 @@ namespace ClawMachine
 
             // 13-5: มุมกางขา (ต้องกางมากกว่ามุมหุบเสมอ)
             openAngle = Mathf.Max(settings.openArmAngle, closedAngle + 8f);
+
+            // สกรูเงิน UFO9: แรงดันลงก่อนเซนเซอร์หยุด = องศาเบี่ยงที่นับว่าต้าน
+            resistanceAngle = settings.pushForceKnob;
 
             // 11-1 + 13-3: POWER × ตำแหน่งสปริง × ขนาดขา -> แรงปลายขา (N) -> ความแข็งสปริง
             // หลักกลศาสตร์: torque ที่ปลายขา = F × รัศมี; สปริงต้องจ่าย torque นี้ที่

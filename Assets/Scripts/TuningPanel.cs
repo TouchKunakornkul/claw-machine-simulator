@@ -90,6 +90,13 @@ namespace ClawMachine
             float newGap = GUILayout.HorizontalSlider(s.shovelGapCm, 0f, 3f);
             if (!Mathf.Approximately(newGap, s.shovelGapCm)) { s.shovelGapCm = newGap; changed = true; }
 
+            // ===== สกรูเงิน UFO9: แรงดันลงก่อนหยุด =====
+            GUILayout.Space(8);
+            GUILayout.Label($"<b>สกรูเงิน (UFO9) แรงดันลงก่อนหยุด</b>  {s.pushForceKnob:0}°", Rich());
+            GUILayout.Label("น้อย = เซนเซอร์ไว ดันเบา หยุดเร็ว / มาก = ดันแรงกว่าก่อนหยุด");
+            float newPush = GUILayout.HorizontalSlider(s.pushForceKnob, 4f, 40f);
+            if (!Mathf.Approximately(newPush, s.pushForceKnob)) { s.pushForceKnob = newPush; changed = true; }
+
             // ===== 13-5: มุมกางขา =====
             GUILayout.Space(8);
             GUILayout.Label($"<b>13-5  มุมกางขา</b>  {s.openArmAngle:0}°  (เลื่อน A=กว้าง / B=แคบ)", Rich());
@@ -183,7 +190,6 @@ namespace ClawMachine
                 // มุม V ของหน้า shovel ตอนหุบ — วัดจากรูป manual ≈ 6° (0 = ราบสนิท)
                 float newTilt = Slider($"มุม V หน้า shovel ตอนหุบ: {grip.ShovelScoopTiltVal:0}° (วัดจริง ~6)", grip.ShovelScoopTiltVal, 0f, 30f);
                 if (!Mathf.Approximately(newTilt, grip.ShovelScoopTiltVal)) grip.ShovelScoopTiltVal = newTilt;
-                grip.ResistanceAngleDeg = Slider($"มุมต้านหยุดดิ่ง: {grip.ResistanceAngleDeg:0}°", grip.ResistanceAngleDeg, 5f, 35f);
                 if (claw != null)
                 {
                     claw.DescentSpeedVal = Slider($"ความเร็วดิ่ง: {claw.DescentSpeedVal:0.00} m/s", claw.DescentSpeedVal, 0.05f, 0.4f);

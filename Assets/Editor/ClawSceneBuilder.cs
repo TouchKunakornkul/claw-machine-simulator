@@ -279,30 +279,41 @@ namespace ClawMachine.EditorTools
             clawHead.localPosition = Vector3.zero;
 
             // โครงสร้างหัวจริง: กลไกเล็ก + "crown" ฝาครอบโดมครอบไว้ (ที่เห็นใหญ่คือฝา ไม่ใช่มอเตอร์)
-            // ฝาครอบโดม (UFO COVER) — ทรงโดมแบนครอบกลไก Ø ~17cm
+            // ฝาครอบโดม (UFO COVER) — ครอบลงมาคลุมโคนขา Ø ~18cm, ก้นโดมต่ำกว่า pivot ขา
             var crown = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             crown.name = "CrownCover";
             crown.transform.SetParent(clawHead, false);
-            crown.transform.localScale = new Vector3(0.17f, 0.09f, 0.17f); // โดมแบน
-            crown.transform.localPosition = new Vector3(0f, 0.035f, 0f);
+            crown.transform.localScale = new Vector3(0.18f, 0.11f, 0.18f); // โดมครอบลึก
+            crown.transform.localPosition = new Vector3(0f, 0.02f, 0f);
             Paint(crown, new Color(0.9f, 0.78f, 0.25f)); // เหลืองทอง
-            Object.DestroyImmediate(crown.GetComponent<Collider>());
+            Object.DestroyImmediate(crown.GetComponent<Collider>()); // sphere collider ใหญ่ไป ใช้ pad แทน
 
-            // วงแหวนฐานครอบ (saucer rim) ใต้โดม
+            // วงแหวนฐานครอบ (saucer rim) รอบโคนขา
             var rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             rim.name = "CrownRim";
             rim.transform.SetParent(clawHead, false);
-            rim.transform.localScale = new Vector3(0.13f, 0.012f, 0.13f);
-            rim.transform.localPosition = new Vector3(0f, 0.01f, 0f);
+            rim.transform.localScale = new Vector3(0.16f, 0.012f, 0.16f);
+            rim.transform.localPosition = new Vector3(0f, -0.028f, 0f);
             Paint(rim, new Color(0.7f, 0.6f, 0.2f));
             Object.DestroyImmediate(rim.GetComponent<Collider>());
+
+            // แผ่นใต้หัว (head underside) = ผิวที่ "โดนกล่อง" จริง — ถ้ากล่องสูง/อยู่กลาง
+            // หัวจะกดโดนแผ่นนี้แล้วหยุดดิ่ง (ตรงกับ research: หัวเครื่องโดนต้านแล้วหยุด)
+            var headPad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            headPad.name = "HeadContact";
+            headPad.transform.SetParent(clawHead, false);
+            headPad.transform.localScale = new Vector3(0.11f, 0.012f, 0.11f);
+            headPad.transform.localPosition = new Vector3(0f, -0.04f, 0f);
+            Paint(headPad, new Color(0.3f, 0.3f, 0.33f));
+            var headCol = headPad.GetComponent<Collider>();
+            if (mat != null) headCol.sharedMaterial = mat;
 
             // กลไกจริง (กล่องเล็กใต้ครอบ ที่ขายึด) — เล็กกว่าฝาครอบมาก
             var hub = GameObject.CreatePrimitive(PrimitiveType.Cube);
             hub.name = "Hub";
             hub.transform.SetParent(clawHead, false);
-            hub.transform.localScale = new Vector3(0.05f, 0.035f, 0.035f);
-            hub.transform.localPosition = new Vector3(0f, -0.02f, 0f);
+            hub.transform.localScale = new Vector3(0.05f, 0.03f, 0.035f);
+            hub.transform.localPosition = new Vector3(0f, -0.038f, 0f);
             Paint(hub, new Color(0.28f, 0.28f, 0.3f));
             Object.DestroyImmediate(hub.GetComponent<Collider>());
 
@@ -326,9 +337,10 @@ namespace ClawMachine.EditorTools
 
             // จุดวัด "ของอยู่ใต้หัว" = ก้น hub (ไม่ใช่ปลายขา!) — ขาจะดิ่งลึกจน shovel
             // อยู่ใต้ก้นกล่องก่อนหัวจะแตะของแล้วค่อยหุบ (ช้อนได้จริง)
+            // จุดเซนเซอร์อยู่ที่ผิวใต้หัว (head underside) — หัวเครื่องโดนของแล้วหยุด
             var dropProbe = new GameObject("DropProbe").transform;
             dropProbe.SetParent(clawHead, false);
-            dropProbe.localPosition = new Vector3(0f, -0.055f, 0f);
+            dropProbe.localPosition = new Vector3(0f, -0.048f, 0f);
 
             var cso = new SerializedObject(claw);
             cso.FindProperty("dropProbe").objectReferenceValue = dropProbe;
@@ -343,8 +355,9 @@ namespace ClawMachine.EditorTools
             so.FindProperty("rightArm").objectReferenceValue = rightArm;
             so.FindProperty("grabPoint").objectReferenceValue = grabPoint;
             so.FindProperty("holdCheckRadius").floatValue = 0.05f;   // ตรวจว่ามีของในง่าม (HUD)
-            so.FindProperty("resistanceAngle").floatValue = 10f;     // เผื่อขาเฉียด/ครูดตอนคร่อมกล่อง
+            so.FindProperty("resistanceAngle").floatValue = 14f;     // เริ่มต้น (ถูก override จาก pushForceKnob)
             so.FindProperty("prizeLayer").intValue = 1 << LayerMask.NameToLayer(PrizeLayerName);
+            so.FindProperty("headCollider").objectReferenceValue = headCol;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             return (claw, grip);
