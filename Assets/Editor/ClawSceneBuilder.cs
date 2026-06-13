@@ -116,7 +116,7 @@ namespace ClawMachine.EditorTools
         // สนามเล่นสเกลจริง (manual: ตู้กว้าง 1683mm = 2 สถานี -> ต่อคน ~84cm, ลึก 875mm)
         private const float FieldHalfX = 0.40f; // กว้าง 80cm
         private const float FieldHalfZ = 0.30f; // ลึก 60cm
-        private const float GlassH = 0.60f;     // กระจกสูง 60cm
+        private const float GlassH = 0.85f;     // กระจกสูง 85cm — หุ้มหัว UFO ไว้ในตู้
 
         private static void BuildCabinet(PhysicsMaterial mat)
         {
@@ -272,24 +272,34 @@ namespace ClawMachine.EditorTools
             clawHead.SetParent(gantry, false);
             clawHead.localPosition = Vector3.zero;
 
-            // โครงสร้างหัวจริง: กลไกเล็ก + "crown" ฝาครอบโดมครอบไว้ (ที่เห็นใหญ่คือฝา ไม่ใช่มอเตอร์)
-            // ฝาครอบโดม (UFO COVER) — ครอบลงมาคลุมโคนขา Ø ~18cm, ก้นโดมต่ำกว่า pivot ขา
-            var crown = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            crown.name = "CrownCover";
-            crown.transform.SetParent(clawHead, false);
-            crown.transform.localScale = new Vector3(0.19f, 0.055f, 0.19f); // จานบินแบน (ไม่ใช่ลูกบอล)
-            crown.transform.localPosition = new Vector3(0f, 0.012f, 0f);
-            Paint(crown, new Color(0.9f, 0.78f, 0.25f)); // เหลืองทอง
-            Object.DestroyImmediate(crown.GetComponent<Collider>()); // sphere collider ใหญ่ไป ใช้ pad แทน
+            // โครงสร้างหัวจริง (อ้างรูปถ่ายตู้จริง FIG 3-1): จานแบนบางๆ มีแถบกลาง
+            // = "saucer" ไม่ใช่โดมทรงกลม — กลไกเล็กซ่อนใต้จาน ขายาวเป็นเพชรปิดใต้
+            // จานหลัก = แผ่นแบน (cylinder) Ø ~17cm หนา ~3.5cm
+            var saucer = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            saucer.name = "CrownCover";
+            saucer.transform.SetParent(clawHead, false);
+            saucer.transform.localScale = new Vector3(0.17f, 0.018f, 0.17f);
+            saucer.transform.localPosition = new Vector3(0f, 0.0f, 0f);
+            Paint(saucer, new Color(0.9f, 0.78f, 0.25f)); // เหลืองทอง
+            Object.DestroyImmediate(saucer.GetComponent<Collider>());
 
-            // วงแหวนฐานครอบ (saucer rim) รอบโคนขา
-            var rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            rim.name = "CrownRim";
-            rim.transform.SetParent(clawHead, false);
-            rim.transform.localScale = new Vector3(0.16f, 0.012f, 0.16f);
-            rim.transform.localPosition = new Vector3(0f, -0.028f, 0f);
-            Paint(rim, new Color(0.7f, 0.6f, 0.2f));
-            Object.DestroyImmediate(rim.GetComponent<Collider>());
+            // โดมตื้นๆ บนจาน (ส่วนนูนเล็กน้อยด้านบน)
+            var dome = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            dome.name = "CrownDome";
+            dome.transform.SetParent(clawHead, false);
+            dome.transform.localScale = new Vector3(0.12f, 0.05f, 0.12f);
+            dome.transform.localPosition = new Vector3(0f, 0.018f, 0f);
+            Paint(dome, new Color(0.93f, 0.82f, 0.3f));
+            Object.DestroyImmediate(dome.GetComponent<Collider>());
+
+            // แถบกลาง (เส้นคาดรอบจาน เหมือนรอยต่อในรูปจริง) — วงแหวนบางสีเข้ม
+            var band = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            band.name = "CrownBand";
+            band.transform.SetParent(clawHead, false);
+            band.transform.localScale = new Vector3(0.175f, 0.006f, 0.175f);
+            band.transform.localPosition = new Vector3(0f, -0.002f, 0f);
+            Paint(band, new Color(0.55f, 0.45f, 0.15f));
+            Object.DestroyImmediate(band.GetComponent<Collider>());
 
             // แผ่นใต้หัว (head underside) = ผิวที่ "โดนกล่อง" จริง — ถ้ากล่องสูง/อยู่กลาง
             // หัวจะกดโดนแผ่นนี้แล้วหยุดดิ่ง (ตรงกับ research: หัวเครื่องโดนต้านแล้วหยุด)
@@ -479,10 +489,10 @@ namespace ClawMachine.EditorTools
 
         private static (Camera front, Camera side) BuildCameras()
         {
-            var front = MakeCamera("FrontCamera", new Vector3(0f, 0.70f, -1.20f), true);
+            var front = MakeCamera("FrontCamera", new Vector3(0f, 0.62f, -1.55f), true);
             front.gameObject.AddComponent<AudioListener>();
 
-            var side = MakeCamera("SideCamera", new Vector3(1.25f, 0.70f, 0f), false);
+            var side = MakeCamera("SideCamera", new Vector3(1.55f, 0.62f, 0f), false);
             return (front, side);
         }
 
@@ -490,7 +500,7 @@ namespace ClawMachine.EditorTools
         {
             var go = new GameObject(name);
             go.transform.position = pos;
-            go.transform.LookAt(new Vector3(0f, 0.30f, 0f));
+            go.transform.LookAt(new Vector3(0f, 0.42f, 0f)); // เล็งกลางตู้ เห็นหัวถึงคาน
             var cam = go.AddComponent<Camera>();
             cam.enabled = enabled;
             cam.backgroundColor = new Color(0.05f, 0.05f, 0.08f);
